@@ -1,0 +1,36 @@
+name: Build CPM Client
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar projeto
+        run: cmake -S . -B build -A x64
+
+      - name: Compilar DLL
+        run: cmake --build build --config Release
+
+      - name: Preparar pacote
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path package\red4ext\plugins\CPMClient | Out-Null
+          New-Item -ItemType Directory -Force -Path package\r6\scripts\CPM | Out-Null
+          New-Item -ItemType Directory -Force -Path package\tools | Out-Null
+          Copy-Item build\Release\CPMClient.dll package\red4ext\plugins\CPMClient\
+          Copy-Item resources\r6\scripts\CPM\CPMClient.reds package\r6\scripts\CPM\
+          Copy-Item tools\CPM-Test-Server-0.0.2.ps1 package\tools\
+          Copy-Item README.md package\
+
+      - name: Enviar CPM Client 0.0.2
+        uses: actions/upload-artifact@v4
+        with:
+          name: CPM-Client-Windows-0.0.2
+          path: package
