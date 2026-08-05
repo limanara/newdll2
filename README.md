@@ -1,85 +1,71 @@
-# CPM Client 0.0.2
+# CPM 0.0.3
 
-Plugin experimental para Cyberpunk 2077 Steam 2.3 no Windows 10. Esta versão
-mantém o handshake UDP da 0.0.1 e envia a posição do jogador ao servidor 20
-vezes por segundo.
+Primeira base multijogador do CPM para Cyberpunk 2077. O cliente envia a
+telemetria local, recebe estados remotos e o servidor nativo retransmite os
+pacotes entre vários jogadores.
 
-## Novidades
+## Implementado
 
-- Ponte redscript -> C++ usando RedLib
-- Posição X, Y e Z do jogador
-- Rotação horizontal em graus
-- Velocidade estimada em unidades por segundo
-- Número sequencial de cada pacote
-- Servidor PowerShell 0.0.2 que mostra a telemetria
+- `CPMClient.dll` com envio e recebimento UDP
+- `CPMServer.exe` para múltiplos jogadores
+- IDs únicos por conexão
+- Relay de posição, rotação e velocidade
+- Timeout de 10 segundos e aviso de desconexão
+- Simulador PowerShell de um segundo jogador
+- Telemetria local a 20 atualizações por segundo
 
-Esta versão ainda não cria outros jogadores dentro do jogo. O objetivo é
-validar a captura e o transporte dos dados antes da sincronização visual.
+O jogador remoto ainda não aparece visualmente no jogo. Nesta versão ele é
+confirmado pelo log do cliente; a criação do personagem remoto será a próxima
+etapa.
 
-## Requisitos no jogo
+## Requisitos
 
 - Cyberpunk 2077 Steam 2.3
-- RED4ext compatível e funcionando
-- redscript compatível com o jogo
+- RED4ext compatível
+- redscript estável instalado
 
-O CMake baixa automaticamente o RED4ext SDK e o RedLib durante a compilação.
+## Compilar
 
-## Compilar no GitHub Actions
+Envie o projeto para o GitHub e execute o workflow **Build CPM Client**. Baixe
+o artefato `CPM-Windows-0.0.3`.
 
-1. Extraia este projeto.
-2. Envie todo o conteúdo para a raiz do repositório GitHub.
-3. Abra **Actions > Build CPM Client > Run workflow**.
-4. Ao terminar, baixe o artefato **CPM-Client-Windows-0.0.2**.
+## Instalar o cliente
 
-## Instalar
-
-Dentro do artefato, copie as pastas `red4ext` e `r6` para:
+Copie as pastas `red4ext` e `r6` do artefato para:
 
 ```text
 D:\SteamLibrary\steamapps\common\Cyberpunk 2077
 ```
 
-Confirme que estes arquivos existem:
+Mantenha `%LOCALAPPDATA%\CPM\connection.json` apontando para `127.0.0.1` e
+porta `11777`.
 
-```text
-D:\SteamLibrary\steamapps\common\Cyberpunk 2077\red4ext\plugins\CPMClient\CPMClient.dll
-D:\SteamLibrary\steamapps\common\Cyberpunk 2077\r6\scripts\CPM\CPMClient.reds
-```
+## Testar dois jogadores
 
-Mantenha o arquivo que já funcionou:
-
-```text
-%LOCALAPPDATA%\CPM\connection.json
-```
-
-## Testar
-
-Abra o PowerShell na pasta `tools` do artefato e execute:
+1. Execute o servidor:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\CPM-Test-Server-0.0.2.ps1"
+.\CPMServer.exe
 ```
 
-Depois abra o jogo, carregue um save e caminhe. O servidor deverá imprimir
-linhas semelhantes a:
+2. Abra o Cyberpunk e carregue um save.
+3. Em outro PowerShell, execute:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Player-Simulator-0.0.3.ps1"
+```
+
+4. Consulte o log do cliente:
+
+```powershell
+Get-Content "$env:LOCALAPPDATA\CPM\logs\CPMClient.log" -Wait -Tail 30
+```
+
+O resultado esperado contém:
 
 ```text
-Player 1 | Seq 20 | X -1450,21 Y 1134,80 Z 31,42 | Rot 92,5 | Vel 3,18
+Remoto 2 | Seq 20 | X ... Y ... Z ... | Rot ... | Vel 2.00
 ```
 
-O log nativo fica em `%LOCALAPPDATA%\CPM\logs\CPMClient.log`. Se o jogo mostrar
-erro ao compilar o script, consulte também os arquivos de log em
-`Cyberpunk 2077\r6\logs`.
-
-## Arquivo de conexão
-
-Exemplo de `%LOCALAPPDATA%\CPM\connection.json`:
-
-```json
-{
-  "address": "127.0.0.1",
-  "port": 11777,
-  "serverName": "CPM Test Server",
-  "protocolVersion": 1
-}
-```
+O servidor também exibirá dois jogadores conectados. Depois que o simulador
+terminar, o servidor enviará a desconexão por timeout.

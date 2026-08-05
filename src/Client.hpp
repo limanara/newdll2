@@ -13,6 +13,7 @@ public:
     void SendPlayerState(float x, float y, float z, float forwardX, float forwardY);
 private:
     void Run(ConnectionConfig);
+    void HandlePacket(const char* data,int bytes);
     std::atomic_bool running_{false};
     std::atomic_bool connected_{false};
     std::atomic_uint32_t playerId_{0};

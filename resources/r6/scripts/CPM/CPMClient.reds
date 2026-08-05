@@ -1,5 +1,3 @@
-module CPM
-
 public static native func CPMSubmitState(x: Float, y: Float, z: Float, forwardX: Float, forwardY: Float) -> Void
 
 public class CPMTelemetryCallback extends DelayCallback {
