@@ -4,6 +4,8 @@
 #include <cmath>
 #include <format>
 #include <random>
+#include <algorithm>
+#include <vector>
 #include <ws2tcpip.h>
 
 namespace CPM {
@@ -42,6 +44,31 @@ void Client::SendPlayerState(float x,float y,float z,float forwardX,float forwar
     std::scoped_lock lock(socketMutex_);if(socket_!=INVALID_SOCKET){sendto(socket_,reinterpret_cast<const char*>(&packet),sizeof(packet),0,reinterpret_cast<const sockaddr*>(&server_),sizeof(server_));sentPackets_++;}
 }
 
+std::size_t Client::RemoteCount(){
+    std::scoped_lock lock(remotesMutex_);
+    return remotes_.size();
+}
+
+bool Client::RemoteAt(std::size_t index,RemoteSnapshot& snapshot){
+    std::scoped_lock lock(remotesMutex_);
+    if(index>=remotes_.size())return false;
+    std::vector<std::uint32_t> ids;ids.reserve(remotes_.size());
+    for(const auto& [id,remote]:remotes_)ids.push_back(id);
+    std::sort(ids.begin(),ids.end());
+    const auto it=remotes_.find(ids[index]);if(it==remotes_.end())return false;
+    const auto& state=it->second.state;
+    snapshot={state.playerId,state.x,state.y,state.z,state.yaw,state.velocity};
+    return true;
+}
+
+bool Client::RemoteById(std::uint32_t playerId,RemoteSnapshot& snapshot){
+    std::scoped_lock lock(remotesMutex_);
+    const auto it=remotes_.find(playerId);if(it==remotes_.end())return false;
+    const auto& state=it->second.state;
+    snapshot={state.playerId,state.x,state.y,state.z,state.yaw,state.velocity};
+    return true;
+}
+
 void Client::HandlePacket(const char* data,int bytes){
     if(bytes<static_cast<int>(sizeof(Protocol::Header)))return;const auto* header=reinterpret_cast<const Protocol::Header*>(data);if(!Protocol::Valid(*header,bytes))return;
     receivedPackets_++;lastServerPacket_=Clock::now();
@@ -64,7 +91,7 @@ void Client::Run(ConnectionConfig config){
     {std::scoped_lock lock(socketMutex_);socket_=socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);}if(socket_==INVALID_SOCKET){Logger::Get().Error("Não foi possível criar o socket UDP.");running_=false;return;}
     DWORD timeout=100;setsockopt(socket_,SOL_SOCKET,SO_RCVTIMEO,reinterpret_cast<const char*>(&timeout),sizeof(timeout));server_={};server_.sin_family=AF_INET;server_.sin_port=htons(config.port);
     if(inet_pton(AF_INET,config.address.c_str(),&server_.sin_addr)!=1){addrinfo hints{};hints.ai_family=AF_INET;hints.ai_socktype=SOCK_DGRAM;addrinfo* result{};if(getaddrinfo(config.address.c_str(),nullptr,&hints,&result)!=0||!result){Logger::Get().Error("Endereço do servidor inválido.");running_=false;return;}server_.sin_addr=reinterpret_cast<sockaddr_in*>(result->ai_addr)->sin_addr;freeaddrinfo(result);}
-    Logger::Get().Info(std::format("CPM 0.0.4 conectando a {}:{}...",config.address,config.port));
+    Logger::Get().Info(std::format("CPM 0.0.5 conectando a {}:{}...",config.address,config.port));
     auto lastHello=Clock::now()-std::chrono::seconds(5),lastHeartbeat=lastHello,lastStats=Clock::now();lastServerPacket_=Clock::now();char packet[512];
     while(running_){
         const auto now=Clock::now();

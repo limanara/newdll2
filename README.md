@@ -1,44 +1,44 @@
-# CPM 0.0.4 — Big Test
+# CPM 0.0.5 — Protótipo visual
 
-Versão integrada para validar a fundação multiplayer do CPM antes da criação
-visual dos jogadores remotos.
+Primeira versão que transforma o estado remoto recebido pela DLL em uma
+entidade visível dentro do Cyberpunk 2077.
 
-## Funcionalidades
+## O que esta versão testa
 
-- Heartbeat nativo a cada 2 segundos, independente do redscript
-- Ping/pong e medição de latência
-- Reconexão automática quando o servidor deixa de responder
-- Sessão identificada por token aleatório
-- Player ID preservado quando endereço ou porta UDP mudam
-- Registro e snapshots de vários jogadores remotos na DLL
-- Detecção aproximada de perda e sequência de pacotes
-- Normalização da rotação entre 0 e 360 graus
-- Servidor com sessões preservadas, métricas e validação
-- Estado atual enviado imediatamente para novos jogadores
-- Simulador integrado de 10 jogadores
-- Teste de 5% de perda e pausa de telemetria protegida pelo heartbeat
+- API nativa de consulta dos jogadores remotos
+- criação segura de uma entidade dinâmica pelo Codeware
+- modelo humano padrão para o primeiro jogador remoto
+- atualização de posição e rotação a cada 50 ms
+- remoção automática da entidade após a desconexão
+- toda a rede, sessões, heartbeat e reconexão do CPM 0.0.4
 
-Esta versão ainda não cria personagens remotos visíveis. Ela valida rede,
-sessões e estabilidade antes da integração de entidades da engine.
+Nesta etapa somente o primeiro jogador remoto é renderizado. A entidade ainda
+não possui animação multiplayer, aparência personalizada, colisão própria nem
+interpolação. Ela será reposicionada diretamente e poderá parecer deslizar.
 
 ## Requisitos
 
 - Cyberpunk 2077 Steam 2.3
 - RED4ext compatível
-- redscript estável instalado
+- redscript estável
+- Codeware compatível instalado
 - `%LOCALAPPDATA%\CPM\connection.json` apontando para `127.0.0.1:11777`
 
-## Compilação
+O Codeware não está incluído neste pacote. Instale-o na raiz do jogo antes de
+instalar o CPM. Sem ele, o redscript informará que `DynamicEntitySystem` não
+existe e o jogo não carregará o script.
 
-Execute o workflow **Build CPM 0.0.4** e baixe o artefato:
+## Compilação no GitHub
+
+Execute o workflow **Build CPM 0.0.5 Visual Prototype** e baixe:
 
 ```text
-CPM-Windows-0.0.4-Big-Test
+CPM-Windows-0.0.5-Visual-Prototype
 ```
 
 ## Instalação
 
-Copie as pastas `red4ext` e `r6` para:
+Copie as pastas `red4ext` e `r6` do artefato para a raiz:
 
 ```text
 D:\SteamLibrary\steamapps\common\Cyberpunk 2077
@@ -46,34 +46,38 @@ D:\SteamLibrary\steamapps\common\Cyberpunk 2077
 
 Aceite substituir `CPMClient.dll` e `CPMClient.reds`.
 
-## Grande teste
+## Teste visual
 
-Feche qualquer servidor CPM antigo. Abra o PowerShell na raiz do artefato e
-execute:
+1. Feche o jogo e qualquer servidor CPM antigo.
+2. Inicie `CPMServer.exe`.
+3. Abra o Cyberpunk e carregue um save.
+   Use um save de teste: o modelo desta fase é apenas um marcador visual e
+   ainda conserva comportamentos nativos de NPC.
+4. Fique próximo das coordenadas `X -642, Y 812, Z 128` usadas nos testes
+   anteriores.
+5. Em outro PowerShell, execute:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\Start-Big-Test.ps1"
+powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Visual-Player-Test-0.0.5.ps1"
 ```
 
-O script iniciará o servidor. Abra o Cyberpunk, carregue o save e pressione
-ENTER na janela do teste. Dez jogadores serão simulados durante cerca de um
-minuto.
+Um NPC deverá aparecer e percorrer um círculo por 60 segundos. Ao final, o
+servidor removerá o jogador por timeout e o NPC desaparecerá em até 15 segundos.
 
-## Resultado esperado
+## Diagnóstico
 
-Servidor:
+Log do cliente:
 
-```text
-STATUS | ativos 11 | sessoes 11 | recebidos ... | relay ... | invalidos 0
+```powershell
+Get-Content "$env:LOCALAPPDATA\CPM\logs\CPMClient.log" -Wait -Tail 60
 ```
 
-Log `%LOCALAPPDATA%\CPM\logs\CPMClient.log`:
+Log do redscript:
 
-```text
-Status | Conectado sim | Ping ... ms | Remotos 10 | Enviados ... | Recebidos ...
-Remoto ... | Seq ... | X ... Y ... Z ... | Rot ... | Vel ...
+```powershell
+Get-Content "D:\SteamLibrary\steamapps\common\Cyberpunk 2077\r6\logs\redscript.log" -Tail 100
 ```
 
-Durante a pausa artificial de 12 segundos, os simuladores devem permanecer
-ativos graças ao heartbeat. A perda remota será maior que zero porque o teste
-remove propositalmente 5% dos pacotes.
+Se ocorrer erro de script, envie as últimas linhas de `redscript.log`. Se o
+jogo abrir mas o NPC não aparecer, envie também `CPMClient.log` e a saída do
+servidor.

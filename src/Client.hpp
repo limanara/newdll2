@@ -3,6 +3,7 @@
 #include "Protocol.hpp"
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <mutex>
 #include <thread>
@@ -12,9 +13,16 @@
 namespace CPM {
 class Client {
 public:
+    struct RemoteSnapshot {
+        std::uint32_t playerId{};
+        float x{},y{},z{},yaw{},velocity{};
+    };
     bool Start(const ConnectionConfig&);
     void Stop();
     void SendPlayerState(float x,float y,float z,float forwardX,float forwardY);
+    std::size_t RemoteCount();
+    bool RemoteAt(std::size_t index,RemoteSnapshot& snapshot);
+    bool RemoteById(std::uint32_t playerId,RemoteSnapshot& snapshot);
 private:
     struct RemotePlayer {
         Protocol::PlayerState state{};
