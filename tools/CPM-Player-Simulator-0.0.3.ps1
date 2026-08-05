@@ -27,7 +27,7 @@ for ([uint32]$sequence = 0; $sequence -lt 1200; $sequence++) {
     [single]$x = -642.0 + [Math]::Cos($angle) * 5.0
     [single]$y = 812.0 + [Math]::Sin($angle) * 5.0
     [single]$z = 128.25
-    [single]$yaw = $angle * 57.2957795
+    [single]$yaw = ($angle * 57.2957795) % 360.0
     [single]$speed = 2.0
     $packet = Header 3 29
     $packet.AddRange([BitConverter]::GetBytes([uint32]$playerId))
