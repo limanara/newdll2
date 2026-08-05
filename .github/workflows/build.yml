@@ -1,9 +1,9 @@
-name: Build CPM 0.0.4
+name: Build CPM 0.0.5 Visual Prototype
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build:
@@ -19,6 +19,17 @@ jobs:
       - name: Compilar cliente e servidor
         run: cmake --build build --config Release
 
+      - name: Verificar arquivos compilados
+        shell: powershell
+        run: |
+          if (!(Test-Path "build\Release\CPMClient.dll")) {
+            throw "CPMClient.dll nao foi gerada."
+          }
+
+          if (!(Test-Path "build\Release\CPMServer.exe")) {
+            throw "CPMServer.exe nao foi gerado."
+          }
+
       - name: Preparar pacote
         shell: powershell
         run: |
@@ -29,14 +40,22 @@ jobs:
           Copy-Item build\Release\CPMClient.dll package\red4ext\plugins\CPMClient\
           Copy-Item build\Release\CPMServer.exe package\
           Copy-Item resources\r6\scripts\CPM\CPMClient.reds package\r6\scripts\CPM\
+
           Copy-Item tools\CPM-Test-Server-0.0.2.ps1 package\tools\
           Copy-Item tools\CPM-Player-Simulator-0.0.3.ps1 package\tools\
           Copy-Item tools\CPM-10-Players-Big-Test-0.0.4.ps1 package\tools\
+          Copy-Item tools\CPM-Visual-Player-Test-0.0.5.ps1 package\tools\
+
           Copy-Item Start-Big-Test.ps1 package\
           Copy-Item README.md package\
 
-      - name: Enviar CPM 0.0.4 Big Test
+      - name: Mostrar conteudo do pacote
+        shell: powershell
+        run: Get-ChildItem package -Recurse
+
+      - name: Enviar CPM 0.0.5 Visual Prototype
         uses: actions/upload-artifact@v4
         with:
-          name: CPM-Windows-0.0.4-Big-Test
+          name: CPM-Windows-0.0.5-Visual-Prototype
           path: package
+          if-no-files-found: error
