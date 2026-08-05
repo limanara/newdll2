@@ -1,4 +1,4 @@
-name: Build CPM Client
+name: Build CPM 0.0.3
 
 on:
   workflow_dispatch:
@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: windows-2022
+
     steps:
       - name: Baixar codigo
         uses: actions/checkout@v4
@@ -15,7 +16,7 @@ jobs:
       - name: Configurar projeto
         run: cmake -S . -B build -A x64
 
-      - name: Compilar DLL
+      - name: Compilar cliente e servidor
         run: cmake --build build --config Release
 
       - name: Preparar pacote
@@ -24,13 +25,16 @@ jobs:
           New-Item -ItemType Directory -Force -Path package\red4ext\plugins\CPMClient | Out-Null
           New-Item -ItemType Directory -Force -Path package\r6\scripts\CPM | Out-Null
           New-Item -ItemType Directory -Force -Path package\tools | Out-Null
+
           Copy-Item build\Release\CPMClient.dll package\red4ext\plugins\CPMClient\
+          Copy-Item build\Release\CPMServer.exe package\
           Copy-Item resources\r6\scripts\CPM\CPMClient.reds package\r6\scripts\CPM\
           Copy-Item tools\CPM-Test-Server-0.0.2.ps1 package\tools\
+          Copy-Item tools\CPM-Player-Simulator-0.0.3.ps1 package\tools\
           Copy-Item README.md package\
 
-      - name: Enviar CPM Client 0.0.2
+      - name: Enviar CPM 0.0.3
         uses: actions/upload-artifact@v4
         with:
-          name: CPM-Client-Windows-0.0.2
+          name: CPM-Windows-0.0.3
           path: package
