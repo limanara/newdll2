@@ -15,7 +15,7 @@ std::atomic_bool g_running{true};
 BOOL WINAPI OnConsole(DWORD){g_running=false;return TRUE;}
 std::uint64_t Key(const sockaddr_in& value){return (static_cast<std::uint64_t>(value.sin_addr.s_addr)<<16)|ntohs(value.sin_port);}
 std::string Address(const sockaddr_in& value){char ip[INET_ADDRSTRLEN]{};inet_ntop(AF_INET,&value.sin_addr,ip,sizeof(ip));return std::format("{}:{}",ip,ntohs(value.sin_port));}
-struct ClientInfo{std::uint32_t id{};sockaddr_in endpoint{};std::chrono::steady_clock::time_point lastSeen{};};
+struct ClientInfo{std::uint32_t id{};sockaddr_in endpoint{};std::chrono::steady_clock::time_point lastSeen{};bool hasState{false};};
 }
 
 int main(int argc,char** argv){
@@ -36,19 +36,23 @@ int main(int argc,char** argv){
             if(count>=static_cast<int>(sizeof(CPM::Protocol::Header))){
                 const auto* header=reinterpret_cast<const CPM::Protocol::Header*>(bytes);const auto key=Key(remote);
                 if(CPM::Protocol::Valid(*header,count)&&header->type==CPM::Protocol::Type::Hello&&header->payloadSize==sizeof(CPM::Protocol::Hello)){
-                    auto it=clients.find(key);if(it==clients.end()){ClientInfo info{nextId++,remote,std::chrono::steady_clock::now()};it=clients.emplace(key,info).first;std::cout<<"Player "<<info.id<<" conectado de "<<Address(remote)<<".\n";}else it->second.lastSeen=std::chrono::steady_clock::now();
+                    auto it=clients.find(key);if(it==clients.end()){ClientInfo info{nextId++,remote,std::chrono::steady_clock::now(),false};it=clients.emplace(key,info).first;std::cout<<"Player "<<info.id<<" conectado de "<<Address(remote)<<".\n";}else it->second.lastSeen=std::chrono::steady_clock::now();
                     const auto welcome=CPM::Protocol::Make(CPM::Protocol::Type::Welcome,CPM::Protocol::Welcome{it->second.id});sendto(socketHandle,reinterpret_cast<const char*>(&welcome),sizeof(welcome),0,reinterpret_cast<sockaddr*>(&remote),sizeof(remote));
                 }else if(CPM::Protocol::Valid(*header,count)&&header->type==CPM::Protocol::Type::PlayerState&&header->payloadSize==sizeof(CPM::Protocol::PlayerState)){
-                    auto it=clients.find(key);if(it!=clients.end()){
-                        it->second.lastSeen=std::chrono::steady_clock::now();auto* state=reinterpret_cast<CPM::Protocol::PlayerState*>(bytes+sizeof(CPM::Protocol::Header));state->playerId=it->second.id;
-                        if((state->sequence%100)==0)std::cout<<"Player "<<state->playerId<<" seq "<<state->sequence<<" | jogadores "<<clients.size()<<"\n";
-                        for(const auto& [otherKey,other]:clients)if(otherKey!=key)sendto(socketHandle,bytes,count,0,reinterpret_cast<const sockaddr*>(&other.endpoint),sizeof(other.endpoint));
+                    auto it=clients.find(key);
+                    if(it==clients.end()){
+                        ClientInfo info{nextId++,remote,std::chrono::steady_clock::now(),true};
+                        it=clients.emplace(key,info).first;
+                        std::cout<<"Player "<<info.id<<" reconectado pela telemetria de "<<Address(remote)<<".\n";
                     }
+                    it->second.lastSeen=std::chrono::steady_clock::now();it->second.hasState=true;auto* state=reinterpret_cast<CPM::Protocol::PlayerState*>(bytes+sizeof(CPM::Protocol::Header));state->playerId=it->second.id;
+                    if((state->sequence%100)==0)std::cout<<"Player "<<state->playerId<<" seq "<<state->sequence<<" | jogadores "<<clients.size()<<"\n";
+                    for(const auto& [otherKey,other]:clients)if(otherKey!=key)sendto(socketHandle,bytes,count,0,reinterpret_cast<const sockaddr*>(&other.endpoint),sizeof(other.endpoint));
                 }
             }
         }
         const auto now=std::chrono::steady_clock::now();std::vector<std::uint64_t> expired;
-        for(const auto& [key,client]:clients)if(now-client.lastSeen>std::chrono::seconds(10))expired.push_back(key);
+        for(const auto& [key,client]:clients){const auto limit=client.hasState?std::chrono::seconds(10):std::chrono::seconds(300);if(now-client.lastSeen>limit)expired.push_back(key);}
         for(const auto key:expired){const auto id=clients.at(key).id;const auto left=CPM::Protocol::Make(CPM::Protocol::Type::PlayerLeft,CPM::Protocol::PlayerLeft{id});for(const auto& [otherKey,other]:clients)if(otherKey!=key)sendto(socketHandle,reinterpret_cast<const char*>(&left),sizeof(left),0,reinterpret_cast<const sockaddr*>(&other.endpoint),sizeof(other.endpoint));std::cout<<"Player "<<id<<" desconectado por timeout.\n";clients.erase(key);}
     }
     closesocket(socketHandle);WSACleanup();std::cout<<"Servidor encerrado.\n";return 0;
