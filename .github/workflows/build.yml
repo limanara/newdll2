@@ -1,4 +1,4 @@
-name: Build CPM 0.0.3
+name: Build CPM 0.0.4
 
 on:
   workflow_dispatch:
@@ -31,10 +31,12 @@ jobs:
           Copy-Item resources\r6\scripts\CPM\CPMClient.reds package\r6\scripts\CPM\
           Copy-Item tools\CPM-Test-Server-0.0.2.ps1 package\tools\
           Copy-Item tools\CPM-Player-Simulator-0.0.3.ps1 package\tools\
+          Copy-Item tools\CPM-10-Players-Big-Test-0.0.4.ps1 package\tools\
+          Copy-Item Start-Big-Test.ps1 package\
           Copy-Item README.md package\
 
-      - name: Enviar CPM 0.0.3
+      - name: Enviar CPM 0.0.4 Big Test
         uses: actions/upload-artifact@v4
         with:
-          name: CPM-Windows-0.0.3
+          name: CPM-Windows-0.0.4-Big-Test
           path: package
