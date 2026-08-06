@@ -49,13 +49,18 @@ Aceite substituir `CPMClient.dll` e `CPMClient.reds`.
 ## Teste visual
 
 1. Feche o jogo e qualquer servidor CPM antigo.
-2. Inicie `CPMServer.exe`.
-3. Abra o Cyberpunk e carregue um save.
+2. Execute na raiz do artefato:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
+```
+
+3. Abra o Cyberpunk e carregue um save quando solicitado.
    Use um save de teste: o modelo desta fase é apenas um marcador visual e
    ainda conserva comportamentos nativos de NPC.
 4. Fique próximo das coordenadas `X -642, Y 812, Z 128` usadas nos testes
    anteriores.
-5. Em outro PowerShell, execute:
+5. Volte ao PowerShell e pressione ENTER. O inicializador executará:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Visual-Player-Test-0.0.5.ps1"
