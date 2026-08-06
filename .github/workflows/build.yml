@@ -19,7 +19,7 @@ jobs:
       - name: Compilar cliente e servidor
         run: cmake --build build --config Release
 
-      - name: Verificar arquivos compilados
+      - name: Verificar binarios
         shell: powershell
         run: |
           if (!(Test-Path "build\Release\CPMClient.dll")) {
@@ -39,6 +39,7 @@ jobs:
 
           Copy-Item build\Release\CPMClient.dll package\red4ext\plugins\CPMClient\
           Copy-Item build\Release\CPMServer.exe package\
+
           Copy-Item resources\r6\scripts\CPM\CPMClient.reds package\r6\scripts\CPM\
 
           Copy-Item tools\CPM-Test-Server-0.0.2.ps1 package\tools\
@@ -47,9 +48,12 @@ jobs:
           Copy-Item tools\CPM-Visual-Player-Test-0.0.5.ps1 package\tools\
 
           Copy-Item Start-Big-Test.ps1 package\
+          Copy-Item Start-Visual-Test.ps1 package\
+          Copy-Item connection.example.json package\
+          Copy-Item install-client.bat package\
           Copy-Item README.md package\
 
-      - name: Mostrar conteudo do pacote
+      - name: Mostrar arquivos do pacote
         shell: powershell
         run: Get-ChildItem package -Recurse
 
