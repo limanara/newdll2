@@ -1,4 +1,4 @@
-name: Build CPM 0.0.5 Visual Prototype
+name: Build CPM 0.0.5 Local Anchor
 
 on:
   workflow_dispatch:
@@ -30,36 +30,95 @@ jobs:
             throw "CPMServer.exe nao foi gerado."
           }
 
+      - name: Verificar arquivos do Local Anchor
+        shell: powershell
+        run: |
+          $arquivos = @(
+            "resources\r6\scripts\CPM\CPMClient.reds",
+            "tools\CPM-Visual-Player-Test-0.0.5.ps1",
+            "Start-Visual-Test.ps1",
+            "connection.example.json",
+            "install-client.bat",
+            "README.md"
+          )
+
+          foreach ($arquivo in $arquivos) {
+            if (!(Test-Path $arquivo)) {
+              throw "Arquivo obrigatorio nao encontrado: $arquivo"
+            }
+          }
+
       - name: Preparar pacote
         shell: powershell
         run: |
-          New-Item -ItemType Directory -Force -Path package\red4ext\plugins\CPMClient | Out-Null
-          New-Item -ItemType Directory -Force -Path package\r6\scripts\CPM | Out-Null
-          New-Item -ItemType Directory -Force -Path package\tools | Out-Null
+          New-Item -ItemType Directory -Force `
+            -Path package\red4ext\plugins\CPMClient | Out-Null
 
-          Copy-Item build\Release\CPMClient.dll package\red4ext\plugins\CPMClient\
-          Copy-Item build\Release\CPMServer.exe package\
+          New-Item -ItemType Directory -Force `
+            -Path package\r6\scripts\CPM | Out-Null
 
-          Copy-Item resources\r6\scripts\CPM\CPMClient.reds package\r6\scripts\CPM\
+          New-Item -ItemType Directory -Force `
+            -Path package\tools | Out-Null
 
-          Copy-Item tools\CPM-Test-Server-0.0.2.ps1 package\tools\
-          Copy-Item tools\CPM-Player-Simulator-0.0.3.ps1 package\tools\
-          Copy-Item tools\CPM-10-Players-Big-Test-0.0.4.ps1 package\tools\
-          Copy-Item tools\CPM-Visual-Player-Test-0.0.5.ps1 package\tools\
+          Copy-Item `
+            build\Release\CPMClient.dll `
+            package\red4ext\plugins\CPMClient\CPMClient.dll
 
-          Copy-Item Start-Big-Test.ps1 package\
-          Copy-Item Start-Visual-Test.ps1 package\
-          Copy-Item connection.example.json package\
-          Copy-Item install-client.bat package\
-          Copy-Item README.md package\
+          Copy-Item `
+            build\Release\CPMServer.exe `
+            package\CPMServer.exe
 
-      - name: Mostrar arquivos do pacote
+          Copy-Item `
+            resources\r6\scripts\CPM\CPMClient.reds `
+            package\r6\scripts\CPM\CPMClient.reds
+
+          Copy-Item `
+            tools\CPM-Test-Server-0.0.2.ps1 `
+            package\tools\CPM-Test-Server-0.0.2.ps1
+
+          Copy-Item `
+            tools\CPM-Player-Simulator-0.0.3.ps1 `
+            package\tools\CPM-Player-Simulator-0.0.3.ps1
+
+          Copy-Item `
+            tools\CPM-10-Players-Big-Test-0.0.4.ps1 `
+            package\tools\CPM-10-Players-Big-Test-0.0.4.ps1
+
+          Copy-Item `
+            tools\CPM-Visual-Player-Test-0.0.5.ps1 `
+            package\tools\CPM-Visual-Player-Test-0.0.5.ps1
+
+          Copy-Item Start-Big-Test.ps1 package\Start-Big-Test.ps1
+          Copy-Item Start-Visual-Test.ps1 package\Start-Visual-Test.ps1
+          Copy-Item connection.example.json package\connection.example.json
+          Copy-Item install-client.bat package\install-client.bat
+          Copy-Item README.md package\README.md
+
+      - name: Validar pacote final
         shell: powershell
-        run: Get-ChildItem package -Recurse
+        run: |
+          $arquivos = @(
+            "package\red4ext\plugins\CPMClient\CPMClient.dll",
+            "package\r6\scripts\CPM\CPMClient.reds",
+            "package\CPMServer.exe",
+            "package\tools\CPM-Visual-Player-Test-0.0.5.ps1",
+            "package\Start-Visual-Test.ps1"
+          )
 
-      - name: Enviar CPM 0.0.5 Visual Prototype
+          foreach ($arquivo in $arquivos) {
+            if (!(Test-Path $arquivo)) {
+              throw "Arquivo ausente no pacote final: $arquivo"
+            }
+          }
+
+          Write-Host "Pacote CPM 0.0.5 Local Anchor validado."
+          Get-ChildItem package -Recurse |
+            Select-Object FullName, Length
+
+      - name: Enviar CPM 0.0.5 Local Anchor
         uses: actions/upload-artifact@v4
         with:
-          name: CPM-Windows-0.0.5-Visual-Prototype
+          name: CPM-Windows-0.0.5-Local-Anchor
           path: package
           if-no-files-found: error
+          retention-days: 14
