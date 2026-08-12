@@ -12,7 +12,8 @@ Write-Host "========================================" -ForegroundColor Cyan
 
 $serverProcess = Start-Process -FilePath $server -WorkingDirectory $root -PassThru
 Write-Host "Servidor iniciado. Abra o Cyberpunk e carregue um save de teste." -ForegroundColor Yellow
-Write-Host "Fique perto de X -642, Y 812, Z 128.25." -ForegroundColor Yellow
+Write-Host "Pode permanecer em qualquer local seguro do mapa." -ForegroundColor Yellow
+Write-Host "O NPC sera criado aproximadamente 3 metros a sua frente." -ForegroundColor Yellow
 Read-Host "Quando estiver dentro do jogo, pressione ENTER"
 
 & powershell -ExecutionPolicy Bypass -File $simulator

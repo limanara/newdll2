@@ -22,7 +22,8 @@ if ($welcome.Length -ne 16 -or [BitConverter]::ToUInt16($welcome, 6) -ne 2) { th
 $playerId = [BitConverter]::ToUInt32($welcome, 12)
 
 Write-Host "CPM 0.0.5: Player visual $playerId conectado." -ForegroundColor Green
-Write-Host "Procure o NPC perto de X -642, Y 812, Z 128.25. Teste de 60 segundos." -ForegroundColor Cyan
+Write-Host "O NPC sera criado perto da posicao atual do seu personagem." -ForegroundColor Cyan
+Write-Host "Nao e necessario usar coordenadas ou teleporte. Teste de 60 segundos." -ForegroundColor Cyan
 $clock = [Diagnostics.Stopwatch]::StartNew()
 
 for ([uint32]$sequence = 0; $sequence -lt 1200; $sequence++) {
@@ -35,9 +36,11 @@ for ([uint32]$sequence = 0; $sequence -lt 1200; $sequence++) {
     }
 
     $angle = $sequence * 0.02
-    [single]$x = -642.0 + [Math]::Cos($angle) * 4.0
-    [single]$y = 812.0 + [Math]::Sin($angle) * 4.0
-    [single]$z = 128.25
+    # Coordenadas virtuais: o cliente usa apenas a diferenca entre os pacotes
+    # e ancora o movimento na posicao atual do jogador real.
+    [single]$x = [Math]::Cos($angle) * 4.0
+    [single]$y = [Math]::Sin($angle) * 4.0
+    [single]$z = 0.0
     [single]$yaw = (($angle * 57.2957795) + 90.0) % 360.0
     [single]$speed = 2.0
     $packet = New-CPMPacket 3 29

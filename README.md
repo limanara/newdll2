@@ -18,7 +18,7 @@ interpolação. Ela será reposicionada diretamente e poderá parecer deslizar.
 
 ## Requisitos
 
-- Cyberpunk 2077 Steam 2.3
+- Cyberpunk 2077 Steam 2.31
 - RED4ext compatível
 - redscript estável
 - Codeware compatível instalado
@@ -30,10 +30,10 @@ existe e o jogo não carregará o script.
 
 ## Compilação no GitHub
 
-Execute o workflow **Build CPM 0.0.5 Visual Prototype** e baixe:
+Execute o workflow **Build CPM 0.0.5 Local Anchor** e baixe:
 
 ```text
-CPM-Windows-0.0.5-Visual-Prototype
+CPM-Windows-0.0.5-Local-Anchor
 ```
 
 ## Instalação
@@ -58,8 +58,8 @@ powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
 3. Abra o Cyberpunk e carregue um save quando solicitado.
    Use um save de teste: o modelo desta fase é apenas um marcador visual e
    ainda conserva comportamentos nativos de NPC.
-4. Fique próximo das coordenadas `X -642, Y 812, Z 128` usadas nos testes
-   anteriores.
+4. Permaneça em qualquer local seguro do mapa. O NPC será criado
+   aproximadamente 3 metros à frente do seu personagem.
 5. Volte ao PowerShell e pressione ENTER. O inicializador executará:
 
 ```powershell
@@ -68,6 +68,10 @@ powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Visual-Player-Test-0.0.5.p
 
 Um NPC deverá aparecer e percorrer um círculo por 60 segundos. Ao final, o
 servidor removerá o jogador por timeout e o NPC desaparecerá em até 15 segundos.
+
+As coordenadas enviadas pelo simulador são tratadas como deslocamento relativo.
+No instante da conexão, o CPM captura a posição atual do jogador real e usa esse
+ponto como âncora. Portanto, CET, teleporte e coordenadas fixas não são necessários.
 
 ## Diagnóstico
 
@@ -80,7 +84,7 @@ Get-Content "$env:LOCALAPPDATA\CPM\logs\CPMClient.log" -Wait -Tail 60
 Log do redscript:
 
 ```powershell
-Get-Content "D:\SteamLibrary\steamapps\common\Cyberpunk 2077\r6\logs\redscript.log" -Tail 100
+Get-Content "D:\SteamLibrary\steamapps\common\Cyberpunk 2077\r6\logs\redscript_rCURRENT.log" -Tail 100
 ```
 
 Se ocorrer erro de script, envie as últimas linhas de `redscript.log`. Se o

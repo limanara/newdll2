@@ -13,6 +13,11 @@ public class CPMTelemetryCallback extends DelayCallback {
     private let remotePlayerID: Int32;
     private let remoteEntityID: EntityID;
     private let hasRemoteEntity: Bool;
+    private let hasRemoteAnchor: Bool;
+    private let remoteOriginX: Float;
+    private let remoteOriginY: Float;
+    private let remoteOriginZ: Float;
+    private let localAnchor: Vector4;
 
     public func SetPlayer(player: ref<PlayerPuppet>) -> Void {
         this.player = player;
@@ -37,17 +42,27 @@ public class CPMTelemetryCallback extends DelayCallback {
         if this.hasRemoteEntity && !CPMRemoteExists(this.remotePlayerID) {
             entitySystem.DeleteEntity(this.remoteEntityID);
             this.hasRemoteEntity = false;
+            this.hasRemoteAnchor = false;
             this.remotePlayerID = -1;
         };
 
         if !this.hasRemoteEntity && CPMRemoteCount() > 0 {
             this.remotePlayerID = CPMRemoteIdAt(0);
             if this.remotePlayerID >= 0 {
+                let playerPosition: Vector4 = this.player.GetWorldPosition();
+                let playerForward: Vector4 = this.player.GetWorldForward();
+                this.remoteOriginX = CPMRemoteX(this.remotePlayerID);
+                this.remoteOriginY = CPMRemoteY(this.remotePlayerID);
+                this.remoteOriginZ = CPMRemoteZ(this.remotePlayerID);
+                this.localAnchor = playerPosition + playerForward * 3.0;
+                this.localAnchor.W = 1.0;
+                this.hasRemoteAnchor = true;
+
                 let spec: ref<DynamicEntitySpec> = new DynamicEntitySpec();
                 spec.recordID = t"Character.spr_animals_bouncer1_ranged1_omaha_mb";
                 spec.appearanceName = n"random";
-                spec.position = new Vector4(CPMRemoteX(this.remotePlayerID), CPMRemoteY(this.remotePlayerID), CPMRemoteZ(this.remotePlayerID), 1.0);
-                spec.orientation = EulerAngles.ToQuat(EulerAngles.new(0.0, 0.0, CPMRemoteYaw(this.remotePlayerID)));
+                spec.position = this.localAnchor;
+                spec.orientation = EulerAngles.ToQuat(EulerAngles(0.0, 0.0, CPMRemoteYaw(this.remotePlayerID)));
                 spec.persistState = false;
                 spec.persistSpawn = false;
                 spec.alwaysSpawned = true;
@@ -59,11 +74,19 @@ public class CPMTelemetryCallback extends DelayCallback {
             };
         };
 
-        if this.hasRemoteEntity {
+        if this.hasRemoteEntity && this.hasRemoteAnchor {
             let remote: ref<GameObject> = entitySystem.GetEntity(this.remoteEntityID) as GameObject;
             if IsDefined(remote) {
-                let target: Vector4 = new Vector4(CPMRemoteX(this.remotePlayerID), CPMRemoteY(this.remotePlayerID), CPMRemoteZ(this.remotePlayerID), 1.0);
-                let rotation: EulerAngles = EulerAngles.new(0.0, 0.0, CPMRemoteYaw(this.remotePlayerID));
+                let offsetX: Float = CPMRemoteX(this.remotePlayerID) - this.remoteOriginX;
+                let offsetY: Float = CPMRemoteY(this.remotePlayerID) - this.remoteOriginY;
+                let offsetZ: Float = CPMRemoteZ(this.remotePlayerID) - this.remoteOriginZ;
+                let target: Vector4 = Vector4(
+                    this.localAnchor.X + offsetX,
+                    this.localAnchor.Y + offsetY,
+                    this.localAnchor.Z + offsetZ,
+                    1.0
+                );
+                let rotation: EulerAngles = EulerAngles(0.0, 0.0, CPMRemoteYaw(this.remotePlayerID));
                 GameInstance.GetTeleportationFacility(this.player.GetGame()).Teleport(remote, target, rotation);
             };
         };
