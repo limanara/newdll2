@@ -7,12 +7,15 @@ public static native func CPMRemoteY(playerID: Int32) -> Float
 public static native func CPMRemoteZ(playerID: Int32) -> Float
 public static native func CPMRemoteYaw(playerID: Int32) -> Float
 public static native func CPMRemoteVelocity(playerID: Int32) -> Float
+public static native func CPMVisualEvent(code: Int32, playerID: Int32) -> Void
 
 public class CPMTelemetryCallback extends DelayCallback {
     private let player: wref<PlayerPuppet>;
     private let remotePlayerID: Int32;
     private let remoteEntityID: EntityID;
     private let hasRemoteEntity: Bool;
+    private let remoteEntityReady: Bool;
+    private let transformConfirmed: Bool;
     private let hasRemoteAnchor: Bool;
     private let remoteOriginX: Float;
     private let remoteOriginY: Float;
@@ -41,7 +44,10 @@ public class CPMTelemetryCallback extends DelayCallback {
 
         if this.hasRemoteEntity && !CPMRemoteExists(this.remotePlayerID) {
             entitySystem.DeleteEntity(this.remoteEntityID);
+            CPMVisualEvent(4, this.remotePlayerID);
             this.hasRemoteEntity = false;
+            this.remoteEntityReady = false;
+            this.transformConfirmed = false;
             this.hasRemoteAnchor = false;
             this.remotePlayerID = -1;
         };
@@ -71,12 +77,22 @@ public class CPMTelemetryCallback extends DelayCallback {
                 spec.tags = [n"CPM.RemotePlayer"];
                 this.remoteEntityID = entitySystem.CreateEntity(spec);
                 this.hasRemoteEntity = true;
+                this.remoteEntityReady = false;
+                this.transformConfirmed = false;
+                CPMVisualEvent(1, this.remotePlayerID);
             };
         };
 
         if this.hasRemoteEntity && this.hasRemoteAnchor {
-            let remote: ref<GameObject> = entitySystem.GetEntity(this.remoteEntityID) as GameObject;
+            // A criacao da entidade e assincrona. GetEntity pode retornar null
+            // durante alguns frames; por isso aguardamos antes de aplicar o estado.
+            let remote: ref<Entity> = entitySystem.GetEntity(this.remoteEntityID);
             if IsDefined(remote) {
+                if !this.remoteEntityReady {
+                    this.remoteEntityReady = true;
+                    CPMVisualEvent(2, this.remotePlayerID);
+                };
+
                 let offsetX: Float = CPMRemoteX(this.remotePlayerID) - this.remoteOriginX;
                 let offsetY: Float = CPMRemoteY(this.remotePlayerID) - this.remoteOriginY;
                 let offsetZ: Float = CPMRemoteZ(this.remotePlayerID) - this.remoteOriginZ;
@@ -86,8 +102,21 @@ public class CPMTelemetryCallback extends DelayCallback {
                     this.localAnchor.Z + offsetZ,
                     1.0
                 );
-                let rotation: EulerAngles = EulerAngles(0.0, 0.0, CPMRemoteYaw(this.remotePlayerID));
-                GameInstance.GetTeleportationFacility(this.player.GetGame()).Teleport(remote, target, rotation);
+                let orientation: Quaternion = EulerAngles.ToQuat(
+                    EulerAngles(0.0, 0.0, CPMRemoteYaw(this.remotePlayerID))
+                );
+                let transform: WorldTransform;
+                WorldTransform.SetPosition(transform, target);
+                WorldTransform.SetOrientation(transform, orientation);
+
+                // NPCs podem sobrescrever a propria posicao via IA/animacao.
+                // Forcar o WorldTransform em cada tick mantem o proxy sincronizado.
+                remote.SetWorldTransform(transform);
+
+                if !this.transformConfirmed {
+                    this.transformConfirmed = true;
+                    CPMVisualEvent(3, this.remotePlayerID);
+                };
             };
         };
     }

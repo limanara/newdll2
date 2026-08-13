@@ -1,13 +1,13 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $server = Join-Path $root "CPMServer.exe"
-$simulator = Join-Path $root "tools\CPM-Visual-Player-Test-0.0.5.ps1"
+$simulator = Join-Path $root "tools\CPM-Visual-Player-Test-0.0.5.1.ps1"
 
 if (!(Test-Path $server)) { throw "CPMServer.exe nao encontrado em $root" }
 if (!(Test-Path $simulator)) { throw "Teste visual nao encontrado em $simulator" }
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "   CPM 0.0.5 - TESTE VISUAL REMOTO" -ForegroundColor Cyan
+Write-Host " CPM 0.0.5.1 - FORCE TRANSFORM TEST" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
 $serverProcess = Start-Process -FilePath $server -WorkingDirectory $root -PassThru
@@ -20,7 +20,7 @@ Read-Host "Quando estiver dentro do jogo, pressione ENTER"
 
 Write-Host ""
 Write-Host "Teste visual concluido. O servidor continua aberto." -ForegroundColor Green
-Write-Host "A entidade remota deve desaparecer depois do timeout." -ForegroundColor Green
+Write-Host "A entidade remota deve andar em circulo e desaparecer depois do timeout." -ForegroundColor Green
 
 $log = Join-Path $env:LOCALAPPDATA "CPM\logs\CPMClient.log"
 if (Test-Path $log) {
