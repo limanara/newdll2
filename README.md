@@ -1,7 +1,7 @@
-# CPM 0.0.6.4 — Continuous Path
+# CPM 0.0.7 — Hybrid Interpolation
 
-Versão experimental que mantém a mesma instância do comando de IA e atualiza
-seu destino sem reenviar o comando ao controlador a cada atualização.
+Protótipo híbrido criado após a análise em vídeo dos testes 0.0.6.x. A posição
+e a rotação são interpoladas diretamente; a IA não escolhe mais o trajeto.
 
 ## O que esta versão testa
 
@@ -9,17 +9,18 @@ seu destino sem reenviar o comando ao controlador a cada atualização.
 - criação segura de uma entidade dinâmica pelo Codeware
 - modelo humano padrão para o primeiro jogador remoto
 - recepção de posição e rotação a cada 50 ms
-- criação de um único comando por estado Walk ou Sprint
-- atualização do destino no mesmo comando aproximadamente a cada 500 ms
-- previsão do destino para sustentar caminhada, corrida e curvas
+- interpolação exponencial da transformação visual a cada 50 ms
+- comando auxiliar enviado somente na troca entre Walk e Sprint
+- nenhuma previsão agressiva na trajetória circular
 - histerese de 500 ms entre os estados Walk e Sprint
-- teleporte somente quando a dessincronização ultrapassa 10 metros
-- navegação e colisão habilitadas durante o movimento
+- recuperação direta somente acima de 15 metros
+- posição independente da navegação e dos obstáculos da IA
 - remoção automática da entidade após a desconexão
 - toda a rede, sessões, heartbeat e reconexão do CPM 0.0.4
 
 Nesta etapa somente o primeiro jogador remoto é renderizado. O objetivo é
-validar continuidade de caminhada, corrida, rotação, navegação e timeout.
+validar se a árvore locomotiva permanece ativa enquanto a transformação é
+interpolada. Esta ainda não é a animação nativa multiplayer definitiva.
 
 ## Requisitos
 
@@ -35,10 +36,10 @@ existe e o jogo não carregará o script.
 
 ## Compilação no GitHub
 
-Execute o workflow **Build CPM 0.0.6.4 Continuous Path** e baixe:
+Execute o workflow **Build CPM 0.0.7 Hybrid Interpolation** e baixe:
 
 ```text
-CPM-Windows-0.0.6.4-Continuous-Path
+CPM-Windows-0.0.7-Hybrid-Interpolation
 ```
 
 ## Instalação
@@ -68,7 +69,7 @@ powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
 5. Volte ao PowerShell e pressione ENTER. O inicializador executará:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Continuous-Path-Test-0.0.6.4.ps1"
+powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Hybrid-Interpolation-Test-0.0.7.ps1"
 ```
 
 Um NPC deverá ficar parado, caminhar, correr e percorrer uma curva. Ao final, o
