@@ -1,4 +1,4 @@
-name: Build CPM 0.0.6 Smooth Synchronization
+name: Build CPM 0.0.6.1 Smooth Sync Hotfix
 
 on:
   workflow_dispatch:
@@ -8,14 +8,14 @@ on:
 
 jobs:
   build:
-    name: Compilar CPM 0.0.6
+    name: Compilar CPM 0.0.6.1
     runs-on: windows-2022
 
     steps:
       - name: Baixar codigo
         uses: actions/checkout@v4
 
-      - name: Validar fontes da versao 0.0.6
+      - name: Validar fontes da versao 0.0.6.1
         shell: powershell
         run: |
           $requiredSources = @(
@@ -28,7 +28,7 @@ jobs:
             "src\Protocol.hpp",
             "server\Main.cpp",
             "resources\r6\scripts\CPM\CPMClient.reds",
-            "tools\CPM-Smooth-Sync-Test-0.0.6.ps1",
+            "tools\CPM-Smooth-Sync-Test-0.0.6.1.ps1",
             "Start-Visual-Test.ps1",
             "Start-Big-Test.ps1",
             "connection.example.json",
@@ -43,18 +43,18 @@ jobs:
           }
 
           $cmake = Get-Content "CMakeLists.txt" -Raw
-          if ($cmake -notmatch "VERSION 0\.0\.6") {
-            throw "CMakeLists.txt nao esta configurado para a versao 0.0.6."
+          if ($cmake -notmatch "VERSION 0\.0\.6\.1") {
+            throw "CMakeLists.txt nao esta configurado para 0.0.6.1."
           }
 
           $clientMain = Get-Content "src\Main.cpp" -Raw
-          if ($clientMain -notmatch "0\.0\.6 Smooth Synchronization") {
-            throw "src\Main.cpp nao corresponde ao CPM Client 0.0.6."
+          if ($clientMain -notmatch "0\.0\.6\.1 Smooth Sync Hotfix") {
+            throw "src\Main.cpp nao corresponde ao CPM Client 0.0.6.1."
           }
 
           $serverMain = Get-Content "server\Main.cpp" -Raw
-          if ($serverMain -notmatch "0\.0\.6 SMOOTH SYNC") {
-            throw "server\Main.cpp nao corresponde ao CPM Server 0.0.6."
+          if ($serverMain -notmatch "0\.0\.6\.1 SMOOTH SYNC HOTFIX") {
+            throw "server\Main.cpp nao corresponde ao CPM Server 0.0.6.1."
           }
 
           $redscript = Get-Content "resources\r6\scripts\CPM\CPMClient.reds" -Raw
@@ -64,15 +64,31 @@ jobs:
           }
 
           if ($redscript -notmatch "AITeleportCommand") {
-            throw "CPMClient.reds nao possui AITeleportCommand de seguranca."
+            throw "CPMClient.reds nao possui AITeleportCommand."
+          }
+
+          if ($redscript -match "ref<AIPositionSpec>") {
+            throw "AIPositionSpec foi declarado incorretamente como ref."
+          }
+
+          if ($redscript -notmatch "let positionSpec: AIPositionSpec;") {
+            throw "Correcao AIPositionSpec 0.0.6.1 ausente."
+          }
+
+          if ($redscript -notmatch "AIPositionSpec\.SetWorldPosition") {
+            throw "Inicializacao correta de AIPositionSpec ausente."
+          }
+
+          if ($redscript -match "CPMVisualEvent") {
+            throw "Declaracao CPMVisualEvent incompatível encontrada."
           }
 
           $visualStarter = Get-Content "Start-Visual-Test.ps1" -Raw
-          if ($visualStarter -notmatch "CPM-Smooth-Sync-Test-0\.0\.6\.ps1") {
-            throw "Start-Visual-Test.ps1 nao aponta para o simulador 0.0.6."
+          if ($visualStarter -notmatch "CPM-Smooth-Sync-Test-0\.0\.6\.1\.ps1") {
+            throw "Start-Visual-Test.ps1 nao aponta para o simulador 0.0.6.1."
           }
 
-          Write-Host "Fontes do CPM 0.0.6 validadas com sucesso." -ForegroundColor Green
+          Write-Host "Fontes do CPM 0.0.6.1 validadas." -ForegroundColor Green
 
       - name: Configurar projeto
         shell: powershell
@@ -89,7 +105,7 @@ jobs:
           cmake --build build --config Release
 
           if ($LASTEXITCODE -ne 0) {
-            throw "Falha ao compilar o CPM 0.0.6."
+            throw "Falha ao compilar o CPM 0.0.6.1."
           }
 
       - name: Verificar binarios
@@ -133,8 +149,8 @@ jobs:
           Copy-Item "resources\r6\scripts\CPM\CPMClient.reds" `
             "package\r6\scripts\CPM\CPMClient.reds" -Force
 
-          Copy-Item "tools\CPM-Smooth-Sync-Test-0.0.6.ps1" `
-            "package\tools\CPM-Smooth-Sync-Test-0.0.6.ps1" -Force
+          Copy-Item "tools\CPM-Smooth-Sync-Test-0.0.6.1.ps1" `
+            "package\tools\CPM-Smooth-Sync-Test-0.0.6.1.ps1" -Force
 
           Copy-Item "tools\CPM-Test-Server-0.0.2.ps1" `
             "package\tools\CPM-Test-Server-0.0.2.ps1" -Force
@@ -160,14 +176,14 @@ jobs:
           Copy-Item "README.md" `
             "package\README.md" -Force
 
-      - name: Validar pacote final
+      - name: Validar pacote final 0.0.6.1
         shell: powershell
         run: |
           $requiredPackageFiles = @(
             "package\red4ext\plugins\CPMClient\CPMClient.dll",
             "package\r6\scripts\CPM\CPMClient.reds",
             "package\CPMServer.exe",
-            "package\tools\CPM-Smooth-Sync-Test-0.0.6.ps1",
+            "package\tools\CPM-Smooth-Sync-Test-0.0.6.1.ps1",
             "package\tools\CPM-Test-Server-0.0.2.ps1",
             "package\tools\CPM-Player-Simulator-0.0.3.ps1",
             "package\tools\CPM-10-Players-Big-Test-0.0.4.ps1",
@@ -189,6 +205,7 @@ jobs:
           }
 
           $forbiddenFiles = @(
+            "package\tools\CPM-Smooth-Sync-Test-0.0.6.ps1",
             "package\tools\CPM-Visual-Player-Test-0.0.5.ps1",
             "package\tools\CPM-Visual-Player-Test-0.0.5.1.ps1",
             "package\tools\CPM-Visual-Player-Test-0.0.5.2.ps1"
@@ -196,36 +213,45 @@ jobs:
 
           foreach ($file in $forbiddenFiles) {
             if (Test-Path $file) {
-              throw "Arquivo antigo encontrado indevidamente no pacote: $file"
+              throw "Arquivo antigo encontrado no pacote: $file"
             }
           }
 
           $packagedStarter = Get-Content "package\Start-Visual-Test.ps1" -Raw
-          if ($packagedStarter -notmatch "CPM-Smooth-Sync-Test-0\.0\.6\.ps1") {
-            throw "Start-Visual-Test.ps1 do pacote aponta para o simulador errado."
+          if ($packagedStarter -notmatch "CPM-Smooth-Sync-Test-0\.0\.6\.1\.ps1") {
+            throw "Start-Visual-Test.ps1 do pacote aponta para arquivo errado."
           }
 
-          $packagedScript = Get-Content "package\r6\scripts\CPM\CPMClient.reds" -Raw
+          $packagedScript = Get-Content `
+            "package\r6\scripts\CPM\CPMClient.reds" -Raw
 
-          if ($packagedScript -notmatch "AIMoveToCommand") {
-            throw "CPMClient.reds do pacote nao contem o movimento suave."
+          if ($packagedScript -match "ref<AIPositionSpec>") {
+            throw "Pacote contem o REDscript quebrado da versao 0.0.6."
+          }
+
+          if ($packagedScript -notmatch "let positionSpec: AIPositionSpec;") {
+            throw "Pacote nao contem a correcao 0.0.6.1."
+          }
+
+          if ($packagedScript -notmatch "AIPositionSpec\.SetWorldPosition") {
+            throw "Inicializacao AIPositionSpec correta ausente no pacote."
           }
 
           if ($packagedScript -match "CPMVisualEvent") {
-            throw "CPMClient.reds possui declaracao nativa CPMVisualEvent incompatível."
+            throw "CPMVisualEvent incompatível encontrado no pacote."
           }
 
           Write-Host ""
-          Write-Host "PACOTE CPM 0.0.6 VALIDADO COM SUCESSO" -ForegroundColor Green
+          Write-Host "PACOTE CPM 0.0.6.1 VALIDADO COM SUCESSO" -ForegroundColor Green
           Write-Host ""
 
           Get-ChildItem "package" -Recurse |
             Select-Object FullName, Length, LastWriteTime
 
-      - name: Enviar CPM 0.0.6 Smooth Synchronization
+      - name: Enviar CPM 0.0.6.1 Smooth Sync Hotfix
         uses: actions/upload-artifact@v4
         with:
-          name: CPM-Windows-0.0.6-Smooth-Synchronization
+          name: CPM-Windows-0.0.6.1-Smooth-Sync-Hotfix
           path: package
           if-no-files-found: error
           retention-days: 30
