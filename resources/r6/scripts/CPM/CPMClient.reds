@@ -218,8 +218,9 @@ public class CPMTelemetryCallback extends DelayCallback {
     private func SendMoveCommand(remote: ref<NPCPuppet>, position: Vector4, running: Bool) -> Void {
         let worldPosition: WorldPosition;
         WorldPosition.SetVector4(worldPosition, position);
-        let positionSpec: ref<AIPositionSpec> = new AIPositionSpec();
-        positionSpec.SetWorldPosition(worldPosition);
+        // AIPositionSpec e uma struct nativa, portanto deve ser criada por valor.
+        let positionSpec: AIPositionSpec;
+        AIPositionSpec.SetWorldPosition(positionSpec, worldPosition);
 
         let command: ref<AIMoveToCommand> = new AIMoveToCommand();
         command.movementTarget = positionSpec;
