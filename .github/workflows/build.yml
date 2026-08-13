@@ -1,4 +1,4 @@
-name: Build CPM 0.0.6.2 Movement Enum Hotfix
+name: Build CPM 0.0.6.3 Persistent Movement
 
 on:
   workflow_dispatch:
@@ -7,17 +7,17 @@ on:
 
 jobs:
   build:
-    name: Compilar CPM 0.0.6.2
+    name: Compilar CPM 0.0.6.3
     runs-on: windows-2022
 
     steps:
       - name: Baixar codigo
         uses: actions/checkout@v4
 
-      - name: Validar arquivos fonte
+      - name: Validar fontes 0.0.6.3
         shell: powershell
         run: |
-          $requiredSources = @(
+          $required = @(
             "CMakeLists.txt",
             "src\Main.cpp",
             "src\Client.cpp",
@@ -27,7 +27,7 @@ jobs:
             "src\Protocol.hpp",
             "server\Main.cpp",
             "resources\r6\scripts\CPM\CPMClient.reds",
-            "tools\CPM-Smooth-Sync-Test-0.0.6.2.ps1",
+            "tools\CPM-Persistent-Movement-Test-0.0.6.3.ps1",
             "Start-Visual-Test.ps1",
             "Start-Big-Test.ps1",
             "connection.example.json",
@@ -35,7 +35,7 @@ jobs:
             "README.md"
           )
 
-          foreach ($file in $requiredSources) {
+          foreach ($file in $required) {
             if (!(Test-Path $file -PathType Leaf)) {
               throw "Arquivo fonte obrigatorio ausente: $file"
             }
@@ -46,57 +46,81 @@ jobs:
           }
 
           $cmake = Get-Content "CMakeLists.txt" -Raw
-          if ($cmake -notmatch "VERSION 0\.0\.6\.2") {
-            throw "CMakeLists.txt nao corresponde a versao 0.0.6.2."
+
+          if ($cmake -notmatch "VERSION 0\.0\.6\.3") {
+            throw "CMakeLists.txt nao corresponde a versao 0.0.6.3."
           }
 
-          $clientMain = Get-Content "src\Main.cpp" -Raw
-          if ($clientMain -notmatch "0\.0\.6\.2 Movement Enum Hotfix") {
-            throw "src\Main.cpp nao corresponde ao CPM Client 0.0.6.2."
+          $client = Get-Content "src\Main.cpp" -Raw
+
+          if ($client -notmatch "0\.0\.6\.3 Persistent Movement") {
+            throw "src/Main.cpp nao corresponde ao cliente 0.0.6.3."
           }
 
-          $serverMain = Get-Content "server\Main.cpp" -Raw
-          if ($serverMain -notmatch "0\.0\.6\.2") {
-            throw "server\Main.cpp nao corresponde ao CPM Server 0.0.6.2."
+          $server = Get-Content "server\Main.cpp" -Raw
+
+          if ($server -notmatch "0\.0\.6\.3 PERSISTENT MOVEMENT") {
+            throw "server/Main.cpp nao corresponde ao servidor 0.0.6.3."
           }
 
-          $redscript = Get-Content `
+          $script = Get-Content `
             "resources\r6\scripts\CPM\CPMClient.reds" -Raw
 
-          if ($redscript -match "ref<AIPositionSpec>") {
-            throw "AIPositionSpec ainda esta declarado incorretamente como ref."
+          if ($script -match "ref<AIPositionSpec>") {
+            throw "AIPositionSpec foi declarado incorretamente como ref."
           }
 
-          if ($redscript -notmatch "let positionSpec: AIPositionSpec;") {
+          if ($script -notmatch "let positionSpec: AIPositionSpec;") {
             throw "Declaracao correta de AIPositionSpec nao encontrada."
           }
 
-          if ($redscript -notmatch "AIPositionSpec\.SetWorldPosition") {
+          if ($script -notmatch "AIPositionSpec\.SetWorldPosition") {
             throw "Inicializacao correta de AIPositionSpec nao encontrada."
           }
 
-          if ($redscript -match 'movementType\s*=\s*n"(Sprint|Walk)"') {
-            throw "movementType ainda utiliza CName, que e incompatível."
+          if ($script -match 'movementType\s*=\s*n"(Sprint|Walk)"') {
+            throw "movementType ainda utiliza CName invalido."
           }
 
-          if ($redscript -notmatch "moveMovementType\.Sprint") {
+          if ($script -notmatch "moveMovementType\.Sprint") {
             throw "Enum moveMovementType.Sprint nao encontrado."
           }
 
-          if ($redscript -notmatch "moveMovementType\.Walk") {
+          if ($script -notmatch "moveMovementType\.Walk") {
             throw "Enum moveMovementType.Walk nao encontrado."
           }
 
-          $visualStarter = Get-Content "Start-Visual-Test.ps1" -Raw
+          if ($script -notmatch "commandTick >= 20") {
+            throw "Intervalo persistente dos comandos nao foi encontrado."
+          }
 
-          if ($visualStarter -notmatch `
-            "CPM-Smooth-Sync-Test-0\.0\.6\.2\.ps1") {
-            throw "Start-Visual-Test.ps1 aponta para o teste errado."
+          if ($script -match "distanceSquared > 2\.25") {
+            throw "Teleporte corretivo antigo ainda esta presente."
+          }
+
+          if ($script -notmatch "distanceSquared > 100\.0") {
+            throw "Limite de teleporte emergencial de 10 metros ausente."
+          }
+
+          if ($script -match "DisableCollider") {
+            throw "A colisao ainda esta desabilitada no NPC remoto."
+          }
+
+          if ($script -notmatch "locomotionCandidateTicks >= 10") {
+            throw "Histerese da locomocao nao foi encontrada."
+          }
+
+          $starter = Get-Content "Start-Visual-Test.ps1" -Raw
+
+          if ($starter -notmatch `
+            "CPM-Persistent-Movement-Test-0\.0\.6\.3\.ps1") {
+            throw "Start-Visual-Test.ps1 aponta para o simulador errado."
           }
 
           Write-Host ""
-          Write-Host "Fontes do CPM 0.0.6.2 validadas." `
+          Write-Host "FONTES CPM 0.0.6.3 VALIDADAS" `
             -ForegroundColor Green
+          Write-Host ""
 
       - name: Configurar projeto
         shell: powershell
@@ -113,18 +137,18 @@ jobs:
           cmake --build build --config Release
 
           if ($LASTEXITCODE -ne 0) {
-            throw "Falha ao compilar o CPM 0.0.6.2."
+            throw "Falha ao compilar o CPM 0.0.6.3."
           }
 
       - name: Verificar binarios
         shell: powershell
         run: |
-          $requiredBinaries = @(
+          $binaries = @(
             "build\Release\CPMClient.dll",
             "build\Release\CPMServer.exe"
           )
 
-          foreach ($file in $requiredBinaries) {
+          foreach ($file in $binaries) {
             if (!(Test-Path $file -PathType Leaf)) {
               throw "Binario obrigatorio nao foi gerado: $file"
             }
@@ -134,7 +158,7 @@ jobs:
             }
           }
 
-          Get-Item $requiredBinaries |
+          Get-Item $binaries |
             Select-Object FullName, Length, LastWriteTime
 
       - name: Preparar pacote limpo
@@ -169,8 +193,8 @@ jobs:
             -Force
 
           Copy-Item `
-            "tools\CPM-Smooth-Sync-Test-0.0.6.2.ps1" `
-            "package\tools\CPM-Smooth-Sync-Test-0.0.6.2.ps1" `
+            "tools\CPM-Persistent-Movement-Test-0.0.6.3.ps1" `
+            "package\tools\CPM-Persistent-Movement-Test-0.0.6.3.ps1" `
             -Force
 
           Copy-Item `
@@ -220,7 +244,7 @@ jobs:
             "package\red4ext\plugins\CPMClient\CPMClient.dll",
             "package\r6\scripts\CPM\CPMClient.reds",
             "package\CPMServer.exe",
-            "package\tools\CPM-Smooth-Sync-Test-0.0.6.2.ps1",
+            "package\tools\CPM-Persistent-Movement-Test-0.0.6.3.ps1",
             "package\tools\CPM-Test-Server-0.0.2.ps1",
             "package\tools\CPM-Player-Simulator-0.0.3.ps1",
             "package\tools\CPM-10-Players-Big-Test-0.0.4.ps1",
@@ -241,18 +265,14 @@ jobs:
             }
           }
 
-          $forbiddenFiles = @(
-            "package\tools\CPM-Visual-Player-Test-0.0.5.ps1",
-            "package\tools\CPM-Visual-Player-Test-0.0.5.1.ps1",
-            "package\tools\CPM-Visual-Player-Test-0.0.5.2.ps1",
-            "package\tools\CPM-Smooth-Sync-Test-0.0.6.ps1",
-            "package\tools\CPM-Smooth-Sync-Test-0.0.6.1.ps1"
-          )
-
-          foreach ($file in $forbiddenFiles) {
-            if (Test-Path $file) {
-              throw "Arquivo antigo encontrado no pacote: $file"
+          $oldTests = Get-ChildItem "package\tools" -File |
+            Where-Object {
+              $_.Name -match `
+                "CPM-(Visual-Player-Test-0\.0\.5|Smooth-Sync-Test-0\.0\.6\.[012])"
             }
+
+          if ($oldTests) {
+            throw "Teste visual antigo encontrado: $($oldTests.Name -join ', ')"
           }
 
           $packagedScript = Get-Content `
@@ -262,51 +282,48 @@ jobs:
             throw "Pacote contem AIPositionSpec declarado como ref."
           }
 
-          if ($packagedScript -notmatch `
-            "let positionSpec: AIPositionSpec;") {
-            throw "Pacote nao contem a declaracao correta de AIPositionSpec."
-          }
-
-          if ($packagedScript -notmatch `
-            "AIPositionSpec\.SetWorldPosition") {
-            throw "Pacote nao inicializa AIPositionSpec corretamente."
-          }
-
           if ($packagedScript -match `
             'movementType\s*=\s*n"(Sprint|Walk)"') {
-            throw "Pacote contem CName invalido em movementType."
+            throw "Pacote contem movementType usando CName."
+          }
+
+          if ($packagedScript -match "distanceSquared > 2\.25") {
+            throw "Pacote contem o teleporte corretivo antigo."
+          }
+
+          if ($packagedScript -match "DisableCollider") {
+            throw "Pacote contem colisao desabilitada."
+          }
+
+          if ($packagedScript -notmatch "commandTick >= 20") {
+            throw "Pacote nao contem comandos persistentes."
           }
 
           if ($packagedScript -notmatch `
-            "moveMovementType\.Sprint") {
-            throw "Pacote nao contem moveMovementType.Sprint."
-          }
-
-          if ($packagedScript -notmatch `
-            "moveMovementType\.Walk") {
-            throw "Pacote nao contem moveMovementType.Walk."
+            "locomotionCandidateTicks >= 10") {
+            throw "Pacote nao contem histerese de locomocao."
           }
 
           $packagedStarter = Get-Content `
             "package\Start-Visual-Test.ps1" -Raw
 
           if ($packagedStarter -notmatch `
-            "CPM-Smooth-Sync-Test-0\.0\.6\.2\.ps1") {
+            "CPM-Persistent-Movement-Test-0\.0\.6\.3\.ps1") {
             throw "Start-Visual-Test.ps1 do pacote aponta para versao errada."
           }
 
           Write-Host ""
-          Write-Host "PACOTE CPM 0.0.6.2 VALIDADO COM SUCESSO" `
+          Write-Host "PACOTE CPM 0.0.6.3 VALIDADO COM SUCESSO" `
             -ForegroundColor Green
           Write-Host ""
 
           Get-ChildItem "package" -Recurse |
             Select-Object FullName, Length, LastWriteTime
 
-      - name: Enviar CPM 0.0.6.2 Movement Enum Hotfix
+      - name: Enviar CPM 0.0.6.3 Persistent Movement
         uses: actions/upload-artifact@v4
         with:
-          name: CPM-Windows-0.0.6.2-Movement-Enum-Hotfix
+          name: CPM-Windows-0.0.6.3-Persistent-Movement
           path: package
           if-no-files-found: error
           retention-days: 30
