@@ -1,6 +1,5 @@
 #include "Native.hpp"
 #include "Client.hpp"
-#include "Logger.hpp"
 #include <RedLib.hpp>
 #include <atomic>
 
@@ -38,17 +37,6 @@ float CPMRemoteZ(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRe
 float CPMRemoteYaw(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?snapshot.yaw:0.0f;}
 float CPMRemoteVelocity(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?snapshot.velocity:0.0f;}
 
-void CPMVisualEvent(int32_t code,int32_t playerId){
-    const char* event="evento desconhecido";
-    switch(code){
-        case 1:event="spawn solicitado";break;
-        case 2:event="entidade pronta";break;
-        case 3:event="transformacao aplicada";break;
-        case 4:event="entidade removida";break;
-    }
-    CPM::Logger::Get().Info("Visual remoto "+std::to_string(playerId)+": "+event+".");
-}
-
 RTTI_DEFINE_GLOBALS({
     RTTI_FUNCTION(CPMSubmitState);
     RTTI_FUNCTION(CPMRemoteCount);
@@ -59,5 +47,4 @@ RTTI_DEFINE_GLOBALS({
     RTTI_FUNCTION(CPMRemoteZ);
     RTTI_FUNCTION(CPMRemoteYaw);
     RTTI_FUNCTION(CPMRemoteVelocity);
-    RTTI_FUNCTION(CPMVisualEvent);
 });

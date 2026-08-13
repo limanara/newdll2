@@ -7,7 +7,6 @@ public static native func CPMRemoteY(playerID: Int32) -> Float
 public static native func CPMRemoteZ(playerID: Int32) -> Float
 public static native func CPMRemoteYaw(playerID: Int32) -> Float
 public static native func CPMRemoteVelocity(playerID: Int32) -> Float
-public static native func CPMVisualEvent(code: Int32, playerID: Int32) -> Void
 
 public class CPMTelemetryCallback extends DelayCallback {
     private let player: wref<PlayerPuppet>;
@@ -44,7 +43,6 @@ public class CPMTelemetryCallback extends DelayCallback {
 
         if this.hasRemoteEntity && !CPMRemoteExists(this.remotePlayerID) {
             entitySystem.DeleteEntity(this.remoteEntityID);
-            CPMVisualEvent(4, this.remotePlayerID);
             this.hasRemoteEntity = false;
             this.remoteEntityReady = false;
             this.transformConfirmed = false;
@@ -79,7 +77,6 @@ public class CPMTelemetryCallback extends DelayCallback {
                 this.hasRemoteEntity = true;
                 this.remoteEntityReady = false;
                 this.transformConfirmed = false;
-                CPMVisualEvent(1, this.remotePlayerID);
             };
         };
 
@@ -90,7 +87,6 @@ public class CPMTelemetryCallback extends DelayCallback {
             if IsDefined(remote) {
                 if !this.remoteEntityReady {
                     this.remoteEntityReady = true;
-                    CPMVisualEvent(2, this.remotePlayerID);
                 };
 
                 let offsetX: Float = CPMRemoteX(this.remotePlayerID) - this.remoteOriginX;
@@ -115,7 +111,6 @@ public class CPMTelemetryCallback extends DelayCallback {
 
                 if !this.transformConfirmed {
                     this.transformConfirmed = true;
-                    CPMVisualEvent(3, this.remotePlayerID);
                 };
             };
         };
