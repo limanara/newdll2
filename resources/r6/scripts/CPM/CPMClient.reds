@@ -20,6 +20,9 @@ public class CPMTelemetryCallback extends DelayCallback {
     private let remoteOriginY: Float;
     private let remoteOriginZ: Float;
     private let localAnchor: Vector4;
+    private let visualYaw: Float;
+    private let commandTick: Int32;
+    private let locomotionState: Int32;
 
     public func SetPlayer(player: ref<PlayerPuppet>) -> Void {
         this.player = player;
@@ -48,6 +51,8 @@ public class CPMTelemetryCallback extends DelayCallback {
             this.transformConfirmed = false;
             this.hasRemoteAnchor = false;
             this.remotePlayerID = -1;
+            this.commandTick = 0;
+            this.locomotionState = 0;
         };
 
         if !this.hasRemoteEntity && CPMRemoteCount() > 0 {
@@ -61,6 +66,9 @@ public class CPMTelemetryCallback extends DelayCallback {
                 this.localAnchor = playerPosition + playerForward * 3.0;
                 this.localAnchor.W = 1.0;
                 this.hasRemoteAnchor = true;
+                this.visualYaw = CPMRemoteYaw(this.remotePlayerID);
+                this.commandTick = 0;
+                this.locomotionState = -1;
 
                 let spec: ref<DynamicEntitySpec> = new DynamicEntitySpec();
                 spec.recordID = t"Character.spr_animals_bouncer1_ranged1_omaha_mb";
@@ -103,24 +111,8 @@ public class CPMTelemetryCallback extends DelayCallback {
                     this.localAnchor.Z + offsetZ,
                     1.0
                 );
-                let orientation: Quaternion = EulerAngles.ToQuat(
-                    EulerAngles(0.0, 0.0, CPMRemoteYaw(this.remotePlayerID))
-                );
-                let transform: WorldTransform;
-                WorldTransform.SetPosition(transform, target);
-                WorldTransform.SetOrientation(transform, orientation);
-
-                // SetWorldTransform e mantido como fallback visual.
-                remote.SetWorldTransform(transform);
-
                 if IsDefined(remotePuppet) {
-                    // NPCPuppet tem a transformacao controlada pela IA. Enviar o
-                    // deslocamento pelo AIController impede que ele seja anulado.
-                    let teleportCommand: ref<AITeleportCommand> = new AITeleportCommand();
-                    teleportCommand.position = target;
-                    teleportCommand.rotation = CPMRemoteYaw(this.remotePlayerID);
-                    teleportCommand.doNavTest = false;
-                    remotePuppet.GetAIControllerComponent().SendCommand(teleportCommand);
+                    this.UpdateControlledPuppet(remotePuppet, target);
                 } else {
                     let remoteObject: ref<GameObject> = remote as GameObject;
                     if IsDefined(remoteObject) {
@@ -137,6 +129,111 @@ public class CPMTelemetryCallback extends DelayCallback {
                 };
             };
         };
+    }
+
+    private func UpdateControlledPuppet(remote: ref<NPCPuppet>, target: Vector4) -> Void {
+        let current: Vector4 = remote.GetWorldPosition();
+        let dx: Float = target.X - current.X;
+        let dy: Float = target.Y - current.Y;
+        let dz: Float = target.Z - current.Z;
+        let distanceSquared: Float = dx * dx + dy * dy + dz * dz;
+        let networkYaw: Float = CPMRemoteYaw(this.remotePlayerID);
+        let yawDelta: Float = networkYaw - this.visualYaw;
+
+        if yawDelta > 180.0 {
+            yawDelta -= 360.0;
+        } else {
+            if yawDelta < -180.0 {
+                yawDelta += 360.0;
+            };
+        };
+        this.visualYaw += yawDelta * 0.22;
+        if this.visualYaw >= 360.0 {
+            this.visualYaw -= 360.0;
+        } else {
+            if this.visualYaw < 0.0 {
+                this.visualYaw += 360.0;
+            };
+        };
+
+        // Erro muito grande: correcao imediata para evitar proxy perdido.
+        if distanceSquared > 16.0 {
+            this.SendTeleport(remote, target, this.visualYaw);
+            this.commandTick = 0;
+            return;
+        };
+
+        let velocity: Float = CPMRemoteVelocity(this.remotePlayerID);
+        let nextState: Int32 = 0;
+        if velocity > 0.20 {
+            if velocity >= 4.20 {
+                nextState = 2;
+            } else {
+                nextState = 1;
+            };
+        };
+
+        this.commandTick += 1;
+        if nextState == 0 {
+            // Parado: apenas corrige deriva perceptivel e suaviza a rotacao.
+            if distanceSquared > 0.16 || this.commandTick >= 5 {
+                let smoothTarget: Vector4 = Vector4(
+                    current.X + dx * 0.35,
+                    current.Y + dy * 0.35,
+                    current.Z + dz * 0.35,
+                    1.0
+                );
+                this.SendTeleport(remote, smoothTarget, this.visualYaw);
+                this.commandTick = 0;
+            };
+        } else {
+            // Em movimento, deixa a IA produzir a animacao de andar/correr.
+            if this.commandTick >= 5 || nextState != this.locomotionState {
+                this.SendMoveCommand(remote, target, nextState == 2);
+                this.commandTick = 0;
+            };
+
+            // Correcao moderada somente quando a navegacao fica atrasada.
+            if distanceSquared > 2.25 {
+                let correction: Vector4 = Vector4(
+                    current.X + dx * 0.45,
+                    current.Y + dy * 0.45,
+                    current.Z + dz * 0.45,
+                    1.0
+                );
+                this.SendTeleport(remote, correction, this.visualYaw);
+            };
+        };
+        this.locomotionState = nextState;
+    }
+
+    private func SendTeleport(remote: ref<NPCPuppet>, position: Vector4, yaw: Float) -> Void {
+        let command: ref<AITeleportCommand> = new AITeleportCommand();
+        command.position = position;
+        command.rotation = yaw;
+        command.doNavTest = false;
+        remote.GetAIControllerComponent().SendCommand(command);
+    }
+
+    private func SendMoveCommand(remote: ref<NPCPuppet>, position: Vector4, running: Bool) -> Void {
+        let worldPosition: WorldPosition;
+        WorldPosition.SetVector4(worldPosition, position);
+        let positionSpec: ref<AIPositionSpec> = new AIPositionSpec();
+        positionSpec.SetWorldPosition(worldPosition);
+
+        let command: ref<AIMoveToCommand> = new AIMoveToCommand();
+        command.movementTarget = positionSpec;
+        command.rotateEntityTowardsFacingTarget = false;
+        command.ignoreNavigation = false;
+        command.desiredDistanceFromTarget = 0.10;
+        if running {
+            command.movementType = n"Sprint";
+        } else {
+            command.movementType = n"Walk";
+        };
+        command.finishWhenDestinationReached = true;
+        command.alwaysUseStealth = false;
+        remote.GetAIControllerComponent().SendCommand(command);
     }
 }
 
