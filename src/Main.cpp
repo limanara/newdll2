@@ -13,7 +13,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle,RED4ext::v1::E
     if(reason==RED4ext::v1::EMainReason::Load){
         Red::TypeInfoRegistrar::RegisterDiscovered();
         CPM::Logger::Get().Open(CPM::DataDirectory()/"logs"/"CPMClient.log");
-        CPM::Logger::Get().Info("CPM Client 0.0.5.1 Force Transform carregado pelo RED4ext.");
+        CPM::Logger::Get().Info("CPM Client 0.0.5.2 Controlled Puppet carregado pelo RED4ext.");
         auto config=CPM::LoadConnection();
         if(!config){CPM::Logger::Get().Error("connection.json ausente ou inválido.");return true;}
         if(config->protocolVersion!=CPM::Protocol::Version){CPM::Logger::Get().Error("Protocolo incompatível.");return true;}

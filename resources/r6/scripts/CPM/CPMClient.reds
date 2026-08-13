@@ -85,8 +85,13 @@ public class CPMTelemetryCallback extends DelayCallback {
             // durante alguns frames; por isso aguardamos antes de aplicar o estado.
             let remote: ref<Entity> = entitySystem.GetEntity(this.remoteEntityID);
             if IsDefined(remote) {
+                let remotePuppet: ref<NPCPuppet> = remote as NPCPuppet;
                 if !this.remoteEntityReady {
                     this.remoteEntityReady = true;
+                    if IsDefined(remotePuppet) {
+                        // O proxy remoto nao deve bloquear o jogador nem outros NPCs.
+                        remotePuppet.GetAIControllerComponent().DisableCollider();
+                    };
                 };
 
                 let offsetX: Float = CPMRemoteX(this.remotePlayerID) - this.remoteOriginX;
@@ -105,9 +110,27 @@ public class CPMTelemetryCallback extends DelayCallback {
                 WorldTransform.SetPosition(transform, target);
                 WorldTransform.SetOrientation(transform, orientation);
 
-                // NPCs podem sobrescrever a propria posicao via IA/animacao.
-                // Forcar o WorldTransform em cada tick mantem o proxy sincronizado.
+                // SetWorldTransform e mantido como fallback visual.
                 remote.SetWorldTransform(transform);
+
+                if IsDefined(remotePuppet) {
+                    // NPCPuppet tem a transformacao controlada pela IA. Enviar o
+                    // deslocamento pelo AIController impede que ele seja anulado.
+                    let teleportCommand: ref<AITeleportCommand> = new AITeleportCommand();
+                    teleportCommand.position = target;
+                    teleportCommand.rotation = CPMRemoteYaw(this.remotePlayerID);
+                    teleportCommand.doNavTest = false;
+                    remotePuppet.GetAIControllerComponent().SendCommand(teleportCommand);
+                } else {
+                    let remoteObject: ref<GameObject> = remote as GameObject;
+                    if IsDefined(remoteObject) {
+                        GameInstance.GetTeleportationFacility(this.player.GetGame()).Teleport(
+                            remoteObject,
+                            target,
+                            EulerAngles(0.0, 0.0, CPMRemoteYaw(this.remotePlayerID))
+                        );
+                    };
+                };
 
                 if !this.transformConfirmed {
                     this.transformConfirmed = true;

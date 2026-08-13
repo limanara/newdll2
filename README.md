@@ -1,4 +1,4 @@
-# CPM 0.0.5.1 — Force Transform
+# CPM 0.0.5.2 — Controlled Puppet
 
 Primeira versão que transforma o estado remoto recebido pela DLL em uma
 entidade visível dentro do Cyberpunk 2077.
@@ -30,10 +30,10 @@ existe e o jogo não carregará o script.
 
 ## Compilação no GitHub
 
-Execute o workflow **Build CPM 0.0.5.1 Force Transform** e baixe:
+Execute o workflow **Build CPM 0.0.5.2 Controlled Puppet** e baixe:
 
 ```text
-CPM-Windows-0.0.5.1-Force-Transform
+CPM-Windows-0.0.5.2-Controlled-Puppet
 ```
 
 ## Instalação
@@ -63,7 +63,7 @@ powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
 5. Volte ao PowerShell e pressione ENTER. O inicializador executará:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Visual-Player-Test-0.0.5.1.ps1"
+powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Visual-Player-Test-0.0.5.2.ps1"
 ```
 
 Um NPC deverá aparecer e percorrer um círculo por 60 segundos. Ao final, o

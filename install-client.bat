@@ -8,5 +8,5 @@ mkdir "%GAME%\red4ext\plugins\CPMClient" 2>nul
 mkdir "%GAME%\r6\scripts\CPM" 2>nul
 copy /Y "build\Release\CPMClient.dll" "%GAME%\red4ext\plugins\CPMClient\CPMClient.dll"
 copy /Y "resources\r6\scripts\CPM\CPMClient.reds" "%GAME%\r6\scripts\CPM\CPMClient.reds"
-echo CPM Client 0.0.5.1 Force Transform instalado.
+echo CPM Client 0.0.5.2 Controlled Puppet instalado.
 pause
