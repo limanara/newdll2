@@ -1,7 +1,7 @@
-# CPM 0.0.6.3 — Persistent Movement
+# CPM 0.0.6.4 — Continuous Path
 
-Versão experimental que mantém comandos de IA por mais tempo para evitar que
-a animação remota seja reiniciada a cada pacote de rede.
+Versão experimental que mantém a mesma instância do comando de IA e atualiza
+seu destino sem reenviar o comando ao controlador a cada atualização.
 
 ## O que esta versão testa
 
@@ -9,8 +9,9 @@ a animação remota seja reiniciada a cada pacote de rede.
 - criação segura de uma entidade dinâmica pelo Codeware
 - modelo humano padrão para o primeiro jogador remoto
 - recepção de posição e rotação a cada 50 ms
-- atualização do destino da IA em intervalos de aproximadamente 1 segundo
-- previsão curta do destino para sustentar caminhada e corrida
+- criação de um único comando por estado Walk ou Sprint
+- atualização do destino no mesmo comando aproximadamente a cada 500 ms
+- previsão do destino para sustentar caminhada, corrida e curvas
 - histerese de 500 ms entre os estados Walk e Sprint
 - teleporte somente quando a dessincronização ultrapassa 10 metros
 - navegação e colisão habilitadas durante o movimento
@@ -34,10 +35,10 @@ existe e o jogo não carregará o script.
 
 ## Compilação no GitHub
 
-Execute o workflow **Build CPM 0.0.6.3 Persistent Movement** e baixe:
+Execute o workflow **Build CPM 0.0.6.4 Continuous Path** e baixe:
 
 ```text
-CPM-Windows-0.0.6.3-Persistent-Movement
+CPM-Windows-0.0.6.4-Continuous-Path
 ```
 
 ## Instalação
@@ -67,7 +68,7 @@ powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
 5. Volte ao PowerShell e pressione ENTER. O inicializador executará:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Persistent-Movement-Test-0.0.6.3.ps1"
+powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Continuous-Path-Test-0.0.6.4.ps1"
 ```
 
 Um NPC deverá ficar parado, caminhar, correr e percorrer uma curva. Ao final, o

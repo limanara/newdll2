@@ -27,6 +27,7 @@ public class CPMTelemetryCallback extends DelayCallback {
     private let locomotionCandidateTicks: Int32;
     private let lastNetworkTarget: Vector4;
     private let hasLastNetworkTarget: Bool;
+    private let activeMoveCommand: ref<AIMoveToCommand>;
 
     public func SetPlayer(player: ref<PlayerPuppet>) -> Void {
         this.player = player;
@@ -60,6 +61,7 @@ public class CPMTelemetryCallback extends DelayCallback {
             this.locomotionCandidate = 0;
             this.locomotionCandidateTicks = 0;
             this.hasLastNetworkTarget = false;
+            this.activeMoveCommand = null;
         };
 
         if !this.hasRemoteEntity && CPMRemoteCount() > 0 {
@@ -79,6 +81,7 @@ public class CPMTelemetryCallback extends DelayCallback {
                 this.locomotionCandidate = 0;
                 this.locomotionCandidateTicks = 0;
                 this.hasLastNetworkTarget = false;
+                this.activeMoveCommand = null;
 
                 let spec: ref<DynamicEntitySpec> = new DynamicEntitySpec();
                 spec.recordID = t"Character.spr_animals_bouncer1_ranged1_omaha_mb";
@@ -168,6 +171,7 @@ public class CPMTelemetryCallback extends DelayCallback {
             this.SendTeleport(remote, target, this.visualYaw);
             this.commandTick = 0;
             this.hasLastNetworkTarget = false;
+            this.activeMoveCommand = null;
             return;
         };
 
@@ -213,12 +217,19 @@ public class CPMTelemetryCallback extends DelayCallback {
 
         this.commandTick += 1;
         if this.locomotionState > 0 {
-            // Um comando persiste por aproximadamente um segundo. Nao ha
-            // teleporte corretivo normal, evitando congelamentos e reinicios.
-            if this.commandTick >= 20 || stateChanged {
+            // Envia apenas no inicio ou na troca Walk/Sprint. Depois disso o
+            // destino da mesma instancia e atualizado sem cancelar a IA.
+            if !IsDefined(this.activeMoveCommand) || stateChanged {
                 this.SendMoveCommand(remote, predictedTarget, this.locomotionState == 2);
                 this.commandTick = 0;
+            } else {
+                if this.commandTick >= 10 {
+                    this.UpdateMoveTarget(predictedTarget);
+                    this.commandTick = 0;
+                };
             };
+        } else {
+            this.activeMoveCommand = null;
         };
     }
 
@@ -249,7 +260,19 @@ public class CPMTelemetryCallback extends DelayCallback {
         };
         command.finishWhenDestinationReached = true;
         command.alwaysUseStealth = false;
+        this.activeMoveCommand = command;
         remote.GetAIControllerComponent().SendCommand(command);
+    }
+
+    private func UpdateMoveTarget(position: Vector4) -> Void {
+        if !IsDefined(this.activeMoveCommand) {
+            return;
+        };
+        let worldPosition: WorldPosition;
+        WorldPosition.SetVector4(worldPosition, position);
+        let positionSpec: AIPositionSpec;
+        AIPositionSpec.SetWorldPosition(positionSpec, worldPosition);
+        this.activeMoveCommand.movementTarget = positionSpec;
     }
 }
 
