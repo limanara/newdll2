@@ -1,4 +1,4 @@
-name: Build CPM 0.0.6.3 Persistent Movement
+name: Build CPM 0.0.6.4 Continuous Path
 
 on:
   workflow_dispatch:
@@ -7,14 +7,14 @@ on:
 
 jobs:
   build:
-    name: Compilar CPM 0.0.6.3
+    name: Compilar CPM 0.0.6.4
     runs-on: windows-2022
 
     steps:
       - name: Baixar codigo
         uses: actions/checkout@v4
 
-      - name: Validar fontes 0.0.6.3
+      - name: Validar fontes 0.0.6.4
         shell: powershell
         run: |
           $required = @(
@@ -27,7 +27,7 @@ jobs:
             "src\Protocol.hpp",
             "server\Main.cpp",
             "resources\r6\scripts\CPM\CPMClient.reds",
-            "tools\CPM-Persistent-Movement-Test-0.0.6.3.ps1",
+            "tools\CPM-Continuous-Path-Test-0.0.6.4.ps1",
             "Start-Visual-Test.ps1",
             "Start-Big-Test.ps1",
             "connection.example.json",
@@ -47,20 +47,20 @@ jobs:
 
           $cmake = Get-Content "CMakeLists.txt" -Raw
 
-          if ($cmake -notmatch "VERSION 0\.0\.6\.3") {
-            throw "CMakeLists.txt nao corresponde a versao 0.0.6.3."
+          if ($cmake -notmatch "VERSION 0\.0\.6\.4") {
+            throw "CMakeLists.txt nao corresponde a versao 0.0.6.4."
           }
 
           $client = Get-Content "src\Main.cpp" -Raw
 
-          if ($client -notmatch "0\.0\.6\.3 Persistent Movement") {
-            throw "src/Main.cpp nao corresponde ao cliente 0.0.6.3."
+          if ($client -notmatch "0\.0\.6\.4 Continuous Path") {
+            throw "src/Main.cpp nao corresponde ao cliente 0.0.6.4."
           }
 
           $server = Get-Content "server\Main.cpp" -Raw
 
-          if ($server -notmatch "0\.0\.6\.3 PERSISTENT MOVEMENT") {
-            throw "server/Main.cpp nao corresponde ao servidor 0.0.6.3."
+          if ($server -notmatch "0\.0\.6\.4 CONTINUOUS PATH") {
+            throw "server/Main.cpp nao corresponde ao servidor 0.0.6.4."
           }
 
           $script = Get-Content `
@@ -90,8 +90,22 @@ jobs:
             throw "Enum moveMovementType.Walk nao encontrado."
           }
 
-          if ($script -notmatch "commandTick >= 20") {
-            throw "Intervalo persistente dos comandos nao foi encontrado."
+          if ($script -notmatch `
+            "activeMoveCommand: ref<AIMoveToCommand>") {
+            throw "Referencia persistente do comando de movimento ausente."
+          }
+
+          if ($script -notmatch "UpdateMoveTarget") {
+            throw "Atualizacao do destino sem reenvio nao encontrada."
+          }
+
+          if ($script -notmatch "commandTick >= 10") {
+            throw "Intervalo de atualizacao do destino nao encontrado."
+          }
+
+          if ($script -notmatch `
+            "this\.activeMoveCommand\.movementTarget = positionSpec") {
+            throw "Destino do comando ativo nao esta sendo atualizado."
           }
 
           if ($script -match "distanceSquared > 2\.25") {
@@ -99,26 +113,26 @@ jobs:
           }
 
           if ($script -notmatch "distanceSquared > 100\.0") {
-            throw "Limite de teleporte emergencial de 10 metros ausente."
+            throw "Teleporte emergencial de 10 metros ausente."
           }
 
           if ($script -match "DisableCollider") {
-            throw "A colisao ainda esta desabilitada no NPC remoto."
+            throw "A colisao ainda esta desabilitada."
           }
 
           if ($script -notmatch "locomotionCandidateTicks >= 10") {
-            throw "Histerese da locomocao nao foi encontrada."
+            throw "Histerese de locomocao nao encontrada."
           }
 
           $starter = Get-Content "Start-Visual-Test.ps1" -Raw
 
           if ($starter -notmatch `
-            "CPM-Persistent-Movement-Test-0\.0\.6\.3\.ps1") {
-            throw "Start-Visual-Test.ps1 aponta para o simulador errado."
+            "CPM-Continuous-Path-Test-0\.0\.6\.4\.ps1") {
+            throw "Start-Visual-Test aponta para o simulador errado."
           }
 
           Write-Host ""
-          Write-Host "FONTES CPM 0.0.6.3 VALIDADAS" `
+          Write-Host "FONTES CPM 0.0.6.4 VALIDADAS" `
             -ForegroundColor Green
           Write-Host ""
 
@@ -137,7 +151,7 @@ jobs:
           cmake --build build --config Release
 
           if ($LASTEXITCODE -ne 0) {
-            throw "Falha ao compilar o CPM 0.0.6.3."
+            throw "Falha ao compilar o CPM 0.0.6.4."
           }
 
       - name: Verificar binarios
@@ -193,8 +207,8 @@ jobs:
             -Force
 
           Copy-Item `
-            "tools\CPM-Persistent-Movement-Test-0.0.6.3.ps1" `
-            "package\tools\CPM-Persistent-Movement-Test-0.0.6.3.ps1" `
+            "tools\CPM-Continuous-Path-Test-0.0.6.4.ps1" `
+            "package\tools\CPM-Continuous-Path-Test-0.0.6.4.ps1" `
             -Force
 
           Copy-Item `
@@ -244,7 +258,7 @@ jobs:
             "package\red4ext\plugins\CPMClient\CPMClient.dll",
             "package\r6\scripts\CPM\CPMClient.reds",
             "package\CPMServer.exe",
-            "package\tools\CPM-Persistent-Movement-Test-0.0.6.3.ps1",
+            "package\tools\CPM-Continuous-Path-Test-0.0.6.4.ps1",
             "package\tools\CPM-Test-Server-0.0.2.ps1",
             "package\tools\CPM-Player-Simulator-0.0.3.ps1",
             "package\tools\CPM-10-Players-Big-Test-0.0.4.ps1",
@@ -265,65 +279,75 @@ jobs:
             }
           }
 
-          $oldTests = Get-ChildItem "package\tools" -File |
+          $oldVisualTests = Get-ChildItem `
+            "package\tools" -File |
             Where-Object {
               $_.Name -match `
-                "CPM-(Visual-Player-Test-0\.0\.5|Smooth-Sync-Test-0\.0\.6\.[012])"
+                "CPM-(Visual-Player-Test-0\.0\.5|Smooth-Sync-Test-0\.0\.6\.[012]|Persistent-Movement-Test-0\.0\.6\.3)"
             }
 
-          if ($oldTests) {
-            throw "Teste visual antigo encontrado: $($oldTests.Name -join ', ')"
+          if ($oldVisualTests) {
+            throw "Teste visual antigo encontrado: $($oldVisualTests.Name -join ', ')"
           }
 
-          $packagedScript = Get-Content `
+          $script = Get-Content `
             "package\r6\scripts\CPM\CPMClient.reds" -Raw
 
-          if ($packagedScript -match "ref<AIPositionSpec>") {
+          if ($script -match "ref<AIPositionSpec>") {
             throw "Pacote contem AIPositionSpec declarado como ref."
           }
 
-          if ($packagedScript -match `
+          if ($script -match `
             'movementType\s*=\s*n"(Sprint|Walk)"') {
             throw "Pacote contem movementType usando CName."
           }
 
-          if ($packagedScript -match "distanceSquared > 2\.25") {
+          if ($script -match "distanceSquared > 2\.25") {
             throw "Pacote contem o teleporte corretivo antigo."
           }
 
-          if ($packagedScript -match "DisableCollider") {
+          if ($script -match "DisableCollider") {
             throw "Pacote contem colisao desabilitada."
           }
 
-          if ($packagedScript -notmatch "commandTick >= 20") {
-            throw "Pacote nao contem comandos persistentes."
+          if ($script -notmatch `
+            "activeMoveCommand: ref<AIMoveToCommand>") {
+            throw "Pacote nao contem referencia persistente do movimento."
           }
 
-          if ($packagedScript -notmatch `
-            "locomotionCandidateTicks >= 10") {
-            throw "Pacote nao contem histerese de locomocao."
+          if ($script -notmatch "UpdateMoveTarget") {
+            throw "Pacote nao contem atualizacao continua do destino."
           }
 
-          $packagedStarter = Get-Content `
+          if ($script -notmatch `
+            "this\.activeMoveCommand\.movementTarget = positionSpec") {
+            throw "Pacote nao atualiza o destino do comando ativo."
+          }
+
+          if ($script -notmatch "commandTick >= 10") {
+            throw "Pacote nao contem o intervalo correto de atualizacao."
+          }
+
+          $starter = Get-Content `
             "package\Start-Visual-Test.ps1" -Raw
 
-          if ($packagedStarter -notmatch `
-            "CPM-Persistent-Movement-Test-0\.0\.6\.3\.ps1") {
-            throw "Start-Visual-Test.ps1 do pacote aponta para versao errada."
+          if ($starter -notmatch `
+            "CPM-Continuous-Path-Test-0\.0\.6\.4\.ps1") {
+            throw "Start-Visual-Test do pacote aponta para versao errada."
           }
 
           Write-Host ""
-          Write-Host "PACOTE CPM 0.0.6.3 VALIDADO COM SUCESSO" `
+          Write-Host "PACOTE CPM 0.0.6.4 VALIDADO COM SUCESSO" `
             -ForegroundColor Green
           Write-Host ""
 
           Get-ChildItem "package" -Recurse |
             Select-Object FullName, Length, LastWriteTime
 
-      - name: Enviar CPM 0.0.6.3 Persistent Movement
+      - name: Enviar CPM 0.0.6.4 Continuous Path
         uses: actions/upload-artifact@v4
         with:
-          name: CPM-Windows-0.0.6.3-Persistent-Movement
+          name: CPM-Windows-0.0.6.4-Continuous-Path
           path: package
           if-no-files-found: error
           retention-days: 30
