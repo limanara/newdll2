@@ -228,9 +228,9 @@ public class CPMTelemetryCallback extends DelayCallback {
         command.ignoreNavigation = false;
         command.desiredDistanceFromTarget = 0.10;
         if running {
-            command.movementType = n"Sprint";
+            command.movementType = moveMovementType.Sprint;
         } else {
-            command.movementType = n"Walk";
+            command.movementType = moveMovementType.Walk;
         };
         command.finishWhenDestinationReached = true;
         command.alwaysUseStealth = false;
