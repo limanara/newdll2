@@ -23,6 +23,10 @@ public class CPMTelemetryCallback extends DelayCallback {
     private let visualYaw: Float;
     private let commandTick: Int32;
     private let locomotionState: Int32;
+    private let locomotionCandidate: Int32;
+    private let locomotionCandidateTicks: Int32;
+    private let lastNetworkTarget: Vector4;
+    private let hasLastNetworkTarget: Bool;
 
     public func SetPlayer(player: ref<PlayerPuppet>) -> Void {
         this.player = player;
@@ -53,6 +57,9 @@ public class CPMTelemetryCallback extends DelayCallback {
             this.remotePlayerID = -1;
             this.commandTick = 0;
             this.locomotionState = 0;
+            this.locomotionCandidate = 0;
+            this.locomotionCandidateTicks = 0;
+            this.hasLastNetworkTarget = false;
         };
 
         if !this.hasRemoteEntity && CPMRemoteCount() > 0 {
@@ -69,6 +76,9 @@ public class CPMTelemetryCallback extends DelayCallback {
                 this.visualYaw = CPMRemoteYaw(this.remotePlayerID);
                 this.commandTick = 0;
                 this.locomotionState = -1;
+                this.locomotionCandidate = 0;
+                this.locomotionCandidateTicks = 0;
+                this.hasLastNetworkTarget = false;
 
                 let spec: ref<DynamicEntitySpec> = new DynamicEntitySpec();
                 spec.recordID = t"Character.spr_animals_bouncer1_ranged1_omaha_mb";
@@ -96,10 +106,6 @@ public class CPMTelemetryCallback extends DelayCallback {
                 let remotePuppet: ref<NPCPuppet> = remote as NPCPuppet;
                 if !this.remoteEntityReady {
                     this.remoteEntityReady = true;
-                    if IsDefined(remotePuppet) {
-                        // O proxy remoto nao deve bloquear o jogador nem outros NPCs.
-                        remotePuppet.GetAIControllerComponent().DisableCollider();
-                    };
                 };
 
                 let offsetX: Float = CPMRemoteX(this.remotePlayerID) - this.remoteOriginX;
@@ -156,55 +162,64 @@ public class CPMTelemetryCallback extends DelayCallback {
             };
         };
 
-        // Erro muito grande: correcao imediata para evitar proxy perdido.
-        if distanceSquared > 16.0 {
+        // Somente uma dessincronizacao extrema permite teleporte. Durante a
+        // locomocao normal a IA fica responsavel por navegacao e animacao.
+        if distanceSquared > 100.0 {
             this.SendTeleport(remote, target, this.visualYaw);
             this.commandTick = 0;
+            this.hasLastNetworkTarget = false;
             return;
         };
 
         let velocity: Float = CPMRemoteVelocity(this.remotePlayerID);
-        let nextState: Int32 = 0;
+        let requestedState: Int32 = 0;
         if velocity > 0.20 {
             if velocity >= 4.20 {
-                nextState = 2;
+                requestedState = 2;
             } else {
-                nextState = 1;
+                requestedState = 1;
             };
         };
+
+        // Histerese: a velocidade precisa permanecer na nova faixa por dez
+        // ciclos (aproximadamente 500 ms) antes de trocar a locomocao.
+        if requestedState != this.locomotionCandidate {
+            this.locomotionCandidate = requestedState;
+            this.locomotionCandidateTicks = 1;
+        } else {
+            this.locomotionCandidateTicks += 1;
+        };
+
+        let stateChanged: Bool = false;
+        if this.locomotionState < 0 || this.locomotionCandidateTicks >= 10 {
+            if this.locomotionState != this.locomotionCandidate {
+                this.locomotionState = this.locomotionCandidate;
+                stateChanged = true;
+            };
+        };
+
+        // O deslocamento entre amostras fornece uma pequena previsao. Assim o
+        // destino permanece a frente do proxy e a animacao nao termina a cada
+        // pacote recebido.
+        let predictedTarget: Vector4 = target;
+        if this.hasLastNetworkTarget {
+            predictedTarget.X += (target.X - this.lastNetworkTarget.X) * 24.0;
+            predictedTarget.Y += (target.Y - this.lastNetworkTarget.Y) * 24.0;
+            predictedTarget.Z += (target.Z - this.lastNetworkTarget.Z) * 6.0;
+        };
+        predictedTarget.W = 1.0;
+        this.lastNetworkTarget = target;
+        this.hasLastNetworkTarget = true;
 
         this.commandTick += 1;
-        if nextState == 0 {
-            // Parado: apenas corrige deriva perceptivel e suaviza a rotacao.
-            if distanceSquared > 0.16 || this.commandTick >= 5 {
-                let smoothTarget: Vector4 = Vector4(
-                    current.X + dx * 0.35,
-                    current.Y + dy * 0.35,
-                    current.Z + dz * 0.35,
-                    1.0
-                );
-                this.SendTeleport(remote, smoothTarget, this.visualYaw);
+        if this.locomotionState > 0 {
+            // Um comando persiste por aproximadamente um segundo. Nao ha
+            // teleporte corretivo normal, evitando congelamentos e reinicios.
+            if this.commandTick >= 20 || stateChanged {
+                this.SendMoveCommand(remote, predictedTarget, this.locomotionState == 2);
                 this.commandTick = 0;
-            };
-        } else {
-            // Em movimento, deixa a IA produzir a animacao de andar/correr.
-            if this.commandTick >= 5 || nextState != this.locomotionState {
-                this.SendMoveCommand(remote, target, nextState == 2);
-                this.commandTick = 0;
-            };
-
-            // Correcao moderada somente quando a navegacao fica atrasada.
-            if distanceSquared > 2.25 {
-                let correction: Vector4 = Vector4(
-                    current.X + dx * 0.45,
-                    current.Y + dy * 0.45,
-                    current.Z + dz * 0.45,
-                    1.0
-                );
-                this.SendTeleport(remote, correction, this.visualYaw);
             };
         };
-        this.locomotionState = nextState;
     }
 
     private func SendTeleport(remote: ref<NPCPuppet>, position: Vector4, yaw: Float) -> Void {

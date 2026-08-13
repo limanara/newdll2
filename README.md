@@ -1,20 +1,24 @@
-# CPM 0.0.6.2 — Movement Enum Hotfix
+# CPM 0.0.6.3 — Persistent Movement
 
-Primeira versão que transforma o estado remoto recebido pela DLL em uma
-entidade visível dentro do Cyberpunk 2077.
+Versão experimental que mantém comandos de IA por mais tempo para evitar que
+a animação remota seja reiniciada a cada pacote de rede.
 
 ## O que esta versão testa
 
 - API nativa de consulta dos jogadores remotos
 - criação segura de uma entidade dinâmica pelo Codeware
 - modelo humano padrão para o primeiro jogador remoto
-- atualização de posição e rotação a cada 50 ms
+- recepção de posição e rotação a cada 50 ms
+- atualização do destino da IA em intervalos de aproximadamente 1 segundo
+- previsão curta do destino para sustentar caminhada e corrida
+- histerese de 500 ms entre os estados Walk e Sprint
+- teleporte somente quando a dessincronização ultrapassa 10 metros
+- navegação e colisão habilitadas durante o movimento
 - remoção automática da entidade após a desconexão
 - toda a rede, sessões, heartbeat e reconexão do CPM 0.0.4
 
-Nesta etapa somente o primeiro jogador remoto é renderizado. A entidade ainda
-não possui animação multiplayer, aparência personalizada, colisão própria nem
-interpolação. Ela será reposicionada diretamente e poderá parecer deslizar.
+Nesta etapa somente o primeiro jogador remoto é renderizado. O objetivo é
+validar continuidade de caminhada, corrida, rotação, navegação e timeout.
 
 ## Requisitos
 
@@ -30,10 +34,10 @@ existe e o jogo não carregará o script.
 
 ## Compilação no GitHub
 
-Execute o workflow **Build CPM 0.0.6.2 Movement Enum Hotfix** e baixe:
+Execute o workflow **Build CPM 0.0.6.3 Persistent Movement** e baixe:
 
 ```text
-CPM-Windows-0.0.6.2-Movement-Enum-Hotfix
+CPM-Windows-0.0.6.3-Persistent-Movement
 ```
 
 ## Instalação
@@ -63,10 +67,10 @@ powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
 5. Volte ao PowerShell e pressione ENTER. O inicializador executará:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Smooth-Sync-Test-0.0.6.2.ps1"
+powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Persistent-Movement-Test-0.0.6.3.ps1"
 ```
 
-Um NPC deverá aparecer e percorrer um círculo por 60 segundos. Ao final, o
+Um NPC deverá ficar parado, caminhar, correr e percorrer uma curva. Ao final, o
 servidor removerá o jogador por timeout e o NPC desaparecerá em até 15 segundos.
 
 As coordenadas enviadas pelo simulador são tratadas como deslocamento relativo.
