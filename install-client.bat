@@ -13,5 +13,7 @@ mkdir "%GAME%\red4ext\plugins\CPMClient" 2>nul
 mkdir "%GAME%\r6\scripts\CPM" 2>nul
 copy /Y "%DLL%" "%GAME%\red4ext\plugins\CPMClient\CPMClient.dll"
 copy /Y "%REDS%" "%GAME%\r6\scripts\CPM\CPMClient.reds"
-echo CPM Client 0.0.8 Multi Remote instalado.
+if not exist "%LOCALAPPDATA%\CPM" mkdir "%LOCALAPPDATA%\CPM"
+if exist "connection.example.json" copy /Y "connection.example.json" "%LOCALAPPDATA%\CPM\connection.json"
+echo CPM Client 0.1.0 Estados e Combate instalado.
 pause

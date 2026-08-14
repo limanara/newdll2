@@ -15,11 +15,16 @@ class Client {
 public:
     struct RemoteSnapshot {
         std::uint32_t playerId{};
-        float x{},y{},z{},yaw{},velocity{};
+        float x{},y{},z{},yaw{},velocity{},aimX{},aimY{},aimZ{};
+        std::int16_t locomotion{},detailedLocomotion{},upperBody{},weaponState{},meleeState{},weaponType{};
+        std::uint16_t flags{};
+        std::uint32_t shotEvent{},reloadEvent{},meleeEvent{};
     };
     bool Start(const ConnectionConfig&);
     void Stop();
-    void SendPlayerState(float x,float y,float z,float forwardX,float forwardY);
+    void SendPlayerState(float x,float y,float z,float forwardX,float forwardY,float aimX,float aimY,float aimZ,
+        std::int32_t locomotion,std::int32_t detailedLocomotion,std::int32_t upperBody,std::int32_t weaponState,
+        std::int32_t meleeState,std::int32_t weaponType,bool weaponEquipped,bool aiming);
     std::size_t RemoteCount();
     bool RemoteAt(std::size_t index,RemoteSnapshot& snapshot);
     bool RemoteById(std::uint32_t playerId,RemoteSnapshot& snapshot);
@@ -52,6 +57,8 @@ private:
     bool hasPreviousState_{false};
     float previousX_{},previousY_{},previousZ_{};
     std::chrono::steady_clock::time_point previousTime_{};
+    std::int32_t previousDetailed_{-1},previousUpperBody_{-1},previousWeaponState_{-1},previousMeleeState_{-1};
+    std::uint32_t shotEvent_{0},reloadEvent_{0},meleeEvent_{0};
     std::mutex remotesMutex_;
     std::unordered_map<std::uint32_t,RemotePlayer> remotes_;
     std::chrono::steady_clock::time_point lastServerPacket_{};

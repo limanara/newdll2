@@ -35,12 +35,26 @@ void Client::SendHeartbeat(){
     std::scoped_lock lock(socketMutex_);if(socket_!=INVALID_SOCKET){sendto(socket_,reinterpret_cast<const char*>(&packet),sizeof(packet),0,reinterpret_cast<const sockaddr*>(&server_),sizeof(server_));sentPackets_++;}
 }
 
-void Client::SendPlayerState(float x,float y,float z,float forwardX,float forwardY){
+void Client::SendPlayerState(float x,float y,float z,float forwardX,float forwardY,float aimX,float aimY,float aimZ,
+    std::int32_t locomotion,std::int32_t detailedLocomotion,std::int32_t upperBody,std::int32_t weaponState,
+    std::int32_t meleeState,std::int32_t weaponType,bool weaponEquipped,bool aiming){
     if(!connected_)return;
     float velocity=0.0f;const auto now=Clock::now();
     {std::scoped_lock lock(stateMutex_);if(hasPreviousState_){const float dt=std::chrono::duration<float>(now-previousTime_).count();if(dt>0.001f){const float dx=x-previousX_,dy=y-previousY_,dz=z-previousZ_;velocity=std::sqrt(dx*dx+dy*dy+dz*dz)/dt;}}previousX_=x;previousY_=y;previousZ_=z;previousTime_=now;hasPreviousState_=true;}
     constexpr float RadToDeg=57.29577951308232f;float yaw=std::atan2(forwardY,forwardX)*RadToDeg;if(yaw<0.0f)yaw+=360.0f;
-    const Protocol::PlayerState state{playerId_.load(),sequence_.fetch_add(1),x,y,z,yaw,velocity,0};const auto packet=Protocol::Make(Protocol::Type::PlayerState,state);
+    std::uint32_t shotEvent,reloadEvent,meleeEvent;
+    {std::scoped_lock lock(stateMutex_);
+        if(weaponState==8&&previousWeaponState_!=8)++shotEvent_;
+        if((weaponState==2&&previousWeaponState_!=2)||(upperBody==3&&previousUpperBody_!=3))++reloadEvent_;
+        if(meleeState>=11&&meleeState<=21&&meleeState!=previousMeleeState_)++meleeEvent_;
+        previousDetailed_=detailedLocomotion;previousUpperBody_=upperBody;previousWeaponState_=weaponState;previousMeleeState_=meleeState;
+        shotEvent=shotEvent_;reloadEvent=reloadEvent_;meleeEvent=meleeEvent_;
+    }
+    std::uint16_t flags=0;if(weaponEquipped)flags|=Protocol::WeaponEquipped;if(aiming)flags|=Protocol::Aiming;
+    const Protocol::PlayerState state{playerId_.load(),sequence_.fetch_add(1),x,y,z,yaw,velocity,aimX,aimY,aimZ,
+        static_cast<std::int16_t>(locomotion),static_cast<std::int16_t>(detailedLocomotion),static_cast<std::int16_t>(upperBody),
+        static_cast<std::int16_t>(weaponState),static_cast<std::int16_t>(meleeState),static_cast<std::int16_t>(weaponType),flags,
+        shotEvent,reloadEvent,meleeEvent};const auto packet=Protocol::Make(Protocol::Type::PlayerState,state);
     std::scoped_lock lock(socketMutex_);if(socket_!=INVALID_SOCKET){sendto(socket_,reinterpret_cast<const char*>(&packet),sizeof(packet),0,reinterpret_cast<const sockaddr*>(&server_),sizeof(server_));sentPackets_++;}
 }
 
@@ -57,7 +71,7 @@ bool Client::RemoteAt(std::size_t index,RemoteSnapshot& snapshot){
     std::sort(ids.begin(),ids.end());
     const auto it=remotes_.find(ids[index]);if(it==remotes_.end())return false;
     const auto& state=it->second.state;
-    snapshot={state.playerId,state.x,state.y,state.z,state.yaw,state.velocity};
+    snapshot={state.playerId,state.x,state.y,state.z,state.yaw,state.velocity,state.aimX,state.aimY,state.aimZ,state.locomotion,state.detailedLocomotion,state.upperBody,state.weaponState,state.meleeState,state.weaponType,state.flags,state.shotEvent,state.reloadEvent,state.meleeEvent};
     return true;
 }
 
@@ -65,7 +79,7 @@ bool Client::RemoteById(std::uint32_t playerId,RemoteSnapshot& snapshot){
     std::scoped_lock lock(remotesMutex_);
     const auto it=remotes_.find(playerId);if(it==remotes_.end())return false;
     const auto& state=it->second.state;
-    snapshot={state.playerId,state.x,state.y,state.z,state.yaw,state.velocity};
+    snapshot={state.playerId,state.x,state.y,state.z,state.yaw,state.velocity,state.aimX,state.aimY,state.aimZ,state.locomotion,state.detailedLocomotion,state.upperBody,state.weaponState,state.meleeState,state.weaponType,state.flags,state.shotEvent,state.reloadEvent,state.meleeEvent};
     return true;
 }
 
@@ -91,7 +105,7 @@ void Client::Run(ConnectionConfig config){
     {std::scoped_lock lock(socketMutex_);socket_=socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);}if(socket_==INVALID_SOCKET){Logger::Get().Error("Não foi possível criar o socket UDP.");running_=false;return;}
     DWORD timeout=100;setsockopt(socket_,SOL_SOCKET,SO_RCVTIMEO,reinterpret_cast<const char*>(&timeout),sizeof(timeout));server_={};server_.sin_family=AF_INET;server_.sin_port=htons(config.port);
     if(inet_pton(AF_INET,config.address.c_str(),&server_.sin_addr)!=1){addrinfo hints{};hints.ai_family=AF_INET;hints.ai_socktype=SOCK_DGRAM;addrinfo* result{};if(getaddrinfo(config.address.c_str(),nullptr,&hints,&result)!=0||!result){Logger::Get().Error("Endereço do servidor inválido.");running_=false;return;}server_.sin_addr=reinterpret_cast<sockaddr_in*>(result->ai_addr)->sin_addr;freeaddrinfo(result);}
-    Logger::Get().Info(std::format("CPM 0.0.8 conectando a {}:{}...",config.address,config.port));
+    Logger::Get().Info(std::format("CPM 0.1.0 Estados e Combate conectando a {}:{}...",config.address,config.port));
     auto lastHello=Clock::now()-std::chrono::seconds(5),lastHeartbeat=lastHello,lastStats=Clock::now();lastServerPacket_=Clock::now();char packet[512];
     while(running_){
         const auto now=Clock::now();

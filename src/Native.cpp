@@ -8,8 +8,11 @@ static std::atomic<Client*> s_client{nullptr};
 void SetActiveClient(Client* client){s_client.store(client);}
 }
 
-void CPMSubmitState(float x,float y,float z,float forwardX,float forwardY){
-    if(auto* client=CPM::s_client.load())client->SendPlayerState(x,y,z,forwardX,forwardY);
+void CPMSubmitState(float x,float y,float z,float forwardX,float forwardY,float aimX,float aimY,float aimZ,
+    int32_t locomotion,int32_t detailedLocomotion,int32_t upperBody,int32_t weaponState,int32_t meleeState,int32_t weaponType,
+    bool weaponEquipped,bool aiming){
+    if(auto* client=CPM::s_client.load())client->SendPlayerState(x,y,z,forwardX,forwardY,aimX,aimY,aimZ,
+        locomotion,detailedLocomotion,upperBody,weaponState,meleeState,weaponType,weaponEquipped,aiming);
 }
 
 int32_t CPMRemoteCount(){
@@ -36,6 +39,20 @@ float CPMRemoteY(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRe
 float CPMRemoteZ(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?snapshot.z:0.0f;}
 float CPMRemoteYaw(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?snapshot.yaw:0.0f;}
 float CPMRemoteVelocity(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?snapshot.velocity:0.0f;}
+float CPMRemoteAimX(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?snapshot.aimX:0.0f;}
+float CPMRemoteAimY(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?snapshot.aimY:0.0f;}
+float CPMRemoteAimZ(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?snapshot.aimZ:0.0f;}
+int32_t CPMRemoteLocomotion(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?snapshot.locomotion:0;}
+int32_t CPMRemoteDetailedLocomotion(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?snapshot.detailedLocomotion:0;}
+int32_t CPMRemoteUpperBody(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?snapshot.upperBody:0;}
+int32_t CPMRemoteWeaponState(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?snapshot.weaponState:0;}
+int32_t CPMRemoteMeleeState(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?snapshot.meleeState:0;}
+int32_t CPMRemoteWeaponType(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?snapshot.weaponType:-1;}
+bool CPMRemoteWeaponEquipped(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)&&(snapshot.flags&CPM::Protocol::WeaponEquipped)!=0;}
+bool CPMRemoteAiming(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)&&(snapshot.flags&CPM::Protocol::Aiming)!=0;}
+int32_t CPMRemoteShotEvent(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?static_cast<int32_t>(snapshot.shotEvent):0;}
+int32_t CPMRemoteReloadEvent(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?static_cast<int32_t>(snapshot.reloadEvent):0;}
+int32_t CPMRemoteMeleeEvent(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?static_cast<int32_t>(snapshot.meleeEvent):0;}
 
 RTTI_DEFINE_GLOBALS({
     RTTI_FUNCTION(CPMSubmitState);
@@ -47,4 +64,9 @@ RTTI_DEFINE_GLOBALS({
     RTTI_FUNCTION(CPMRemoteZ);
     RTTI_FUNCTION(CPMRemoteYaw);
     RTTI_FUNCTION(CPMRemoteVelocity);
+    RTTI_FUNCTION(CPMRemoteAimX); RTTI_FUNCTION(CPMRemoteAimY); RTTI_FUNCTION(CPMRemoteAimZ);
+    RTTI_FUNCTION(CPMRemoteLocomotion); RTTI_FUNCTION(CPMRemoteDetailedLocomotion);
+    RTTI_FUNCTION(CPMRemoteUpperBody); RTTI_FUNCTION(CPMRemoteWeaponState); RTTI_FUNCTION(CPMRemoteMeleeState);
+    RTTI_FUNCTION(CPMRemoteWeaponType); RTTI_FUNCTION(CPMRemoteWeaponEquipped); RTTI_FUNCTION(CPMRemoteAiming);
+    RTTI_FUNCTION(CPMRemoteShotEvent); RTTI_FUNCTION(CPMRemoteReloadEvent); RTTI_FUNCTION(CPMRemoteMeleeEvent);
 });

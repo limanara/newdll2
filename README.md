@@ -1,10 +1,15 @@
-# CPM 0.0.8 — Multi Remote
+# CPM 0.1.0 — Estados básicos e combate visual
 
-Evolução da base estável 0.0.7. A interpolação fluida validada foi preservada,
-mas agora cada jogador remoto recebe sua própria entidade e estado visual.
+Base experimental que preserva integralmente a interpolação aprovada na 0.0.8
+e adiciona protocolo explícito para estados do personagem e ações de combate.
 
 ## O que esta versão testa
 
+- protocolo v2 incompatível com servidores e simuladores antigos
+- parado, caminhada, corrida, agachamento, salto, queda e aterrissagem
+- arma equipada, categoria da arma, mira e direção da mira
+- eventos numerados de tiro, recarga e ataque corpo a corpo
+- leitura dos estados reais pelo PlayerStateMachine Blackboard
 - API nativa de consulta dos jogadores remotos
 - criação segura de uma entidade dinâmica pelo Codeware
 - criação simultânea de vários jogadores remotos
@@ -19,9 +24,9 @@ mas agora cada jogador remoto recebe sua própria entidade e estado visual.
 - remoção automática da entidade após a desconexão
 - toda a rede, sessões, heartbeat e reconexão do CPM 0.0.4
 
-O teste incluído conecta cinco jogadores simulados ao mesmo tempo. Eles devem
-aparecer em formação, permanecer parados, caminhar, correr, percorrer curvas e
-ser removidos individualmente após o timeout.
+O teste incluído conecta um jogador simulado e percorre todas as fases em uma
+execução. A arma física, projéteis, dano e inventário ainda não são replicados;
+esta versão valida transporte e animação visual dos estados.
 
 ## Requisitos
 
@@ -37,10 +42,10 @@ existe e o jogo não carregará o script.
 
 ## Compilação no GitHub
 
-Execute o workflow **Build CPM 0.0.8 Multi Remote** e baixe:
+Execute o workflow **Build CPM 0.1.0 States Combat** e baixe:
 
 ```text
-CPM-Windows-0.0.8-Multi-Remote
+CPM-Windows-0.1.0-States-Combat
 ```
 
 ## Instalação
@@ -70,11 +75,11 @@ powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
 5. Volte ao PowerShell e pressione ENTER. O inicializador executará:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Multi-Remote-Test-0.0.8.ps1"
+powershell -ExecutionPolicy Bypass -File ".\tools\CPM-States-Combat-Test-0.1.0.ps1"
 ```
 
-Cinco NPCs deverão ficar parados, caminhar, correr e percorrer curvas. Ao final,
-o servidor removerá os jogadores por timeout e todos desaparecerão.
+O NPC deverá ficar parado, caminhar, correr, agachar, saltar, mirar, disparar,
+recarregar e atacar. Ao final, será removido pelo timeout.
 
 As coordenadas enviadas pelo simulador são tratadas como deslocamento relativo.
 No instante da conexão, o CPM captura a posição atual do jogador real e usa esse

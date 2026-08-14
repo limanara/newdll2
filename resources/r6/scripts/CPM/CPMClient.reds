@@ -1,4 +1,7 @@
-public static native func CPMSubmitState(x: Float, y: Float, z: Float, forwardX: Float, forwardY: Float) -> Void
+public static native func CPMSubmitState(x: Float, y: Float, z: Float, forwardX: Float, forwardY: Float,
+    aimX: Float, aimY: Float, aimZ: Float, locomotion: Int32, detailedLocomotion: Int32,
+    upperBody: Int32, weaponState: Int32, meleeState: Int32, weaponType: Int32,
+    weaponEquipped: Bool, aiming: Bool) -> Void
 public static native func CPMRemoteCount() -> Int32
 public static native func CPMRemoteIdAt(index: Int32) -> Int32
 public static native func CPMRemoteExists(playerID: Int32) -> Bool
@@ -7,6 +10,20 @@ public static native func CPMRemoteY(playerID: Int32) -> Float
 public static native func CPMRemoteZ(playerID: Int32) -> Float
 public static native func CPMRemoteYaw(playerID: Int32) -> Float
 public static native func CPMRemoteVelocity(playerID: Int32) -> Float
+public static native func CPMRemoteAimX(playerID: Int32) -> Float
+public static native func CPMRemoteAimY(playerID: Int32) -> Float
+public static native func CPMRemoteAimZ(playerID: Int32) -> Float
+public static native func CPMRemoteLocomotion(playerID: Int32) -> Int32
+public static native func CPMRemoteDetailedLocomotion(playerID: Int32) -> Int32
+public static native func CPMRemoteUpperBody(playerID: Int32) -> Int32
+public static native func CPMRemoteWeaponState(playerID: Int32) -> Int32
+public static native func CPMRemoteMeleeState(playerID: Int32) -> Int32
+public static native func CPMRemoteWeaponType(playerID: Int32) -> Int32
+public static native func CPMRemoteWeaponEquipped(playerID: Int32) -> Bool
+public static native func CPMRemoteAiming(playerID: Int32) -> Bool
+public static native func CPMRemoteShotEvent(playerID: Int32) -> Int32
+public static native func CPMRemoteReloadEvent(playerID: Int32) -> Int32
+public static native func CPMRemoteMeleeEvent(playerID: Int32) -> Int32
 
 public class CPMRemoteVisual extends IScriptable {
     private let player: wref<PlayerPuppet>;
@@ -22,6 +39,12 @@ public class CPMRemoteVisual extends IScriptable {
     private let locomotionState: Int32;
     private let locomotionCandidate: Int32;
     private let locomotionCandidateTicks: Int32;
+    private let lastDetailedLocomotion: Int32;
+    private let lastCrouched: Bool;
+    private let lastAiming: Bool;
+    private let lastShotEvent: Int32;
+    private let lastReloadEvent: Int32;
+    private let lastMeleeEvent: Int32;
 
     public func Initialize(player: ref<PlayerPuppet>, playerID: Int32, slot: Int32) -> Void {
         this.player = player;
@@ -41,6 +64,12 @@ public class CPMRemoteVisual extends IScriptable {
         this.locomotionState = -1;
         this.locomotionCandidate = 0;
         this.locomotionCandidateTicks = 0;
+        this.lastDetailedLocomotion = -1;
+        this.lastCrouched = false;
+        this.lastAiming = false;
+        this.lastShotEvent = CPMRemoteShotEvent(playerID);
+        this.lastReloadEvent = CPMRemoteReloadEvent(playerID);
+        this.lastMeleeEvent = CPMRemoteMeleeEvent(playerID);
         this.Spawn();
     }
 
@@ -74,7 +103,48 @@ public class CPMRemoteVisual extends IScriptable {
             1.0
         );
         this.UpdateLocomotion(remotePuppet, target);
+        this.UpdateNetworkStates(remoteObject);
         this.InterpolateTransform(remoteObject, target);
+    }
+
+    private func UpdateNetworkStates(remote: ref<GameObject>) -> Void {
+        let detailed: Int32 = CPMRemoteDetailedLocomotion(this.playerID);
+        let crouched: Bool = CPMRemoteLocomotion(this.playerID) == 1 || detailed == 3 || detailed == 30;
+        if crouched != this.lastCrouched {
+            let stance: ref<AnimFeature_Stance> = new AnimFeature_Stance();
+            if crouched { stance.SetStanceState(animStanceState.Crouch); }
+            else { stance.SetStanceState(animStanceState.Stand); };
+            AnimationControllerComponent.ApplyFeature(remote, n"Stance", stance);
+            this.lastCrouched = crouched;
+        };
+        if detailed != this.lastDetailedLocomotion {
+            if detailed == 18 || detailed == 19 || detailed == 20 || detailed == 21 {
+                AnimationControllerComponent.PushEvent(remote, n"Jump");
+            };
+            if detailed >= 23 && detailed <= 27 {
+                AnimationControllerComponent.PushEvent(remote, n"Land");
+            };
+            this.lastDetailedLocomotion = detailed;
+        };
+        let aiming: Bool = CPMRemoteAiming(this.playerID);
+        if aiming {
+            let aim: ref<AnimFeature_Aim> = new AnimFeature_Aim();
+            let aimPoint: Vector4 = Vector4(
+                this.visualPosition.X + CPMRemoteAimX(this.playerID) * 20.0,
+                this.visualPosition.Y + CPMRemoteAimY(this.playerID) * 20.0,
+                this.visualPosition.Z + CPMRemoteAimZ(this.playerID) * 20.0,
+                1.0
+            );
+            aim.Aim(aimPoint);
+            AnimationControllerComponent.ApplyFeature(remote, n"Aim", aim);
+        };
+        this.lastAiming = aiming;
+        let shotEvent: Int32 = CPMRemoteShotEvent(this.playerID);
+        if shotEvent != this.lastShotEvent { AnimationControllerComponent.PushEvent(remote, n"Shoot"); this.lastShotEvent = shotEvent; };
+        let reloadEvent: Int32 = CPMRemoteReloadEvent(this.playerID);
+        if reloadEvent != this.lastReloadEvent { AnimationControllerComponent.PushEvent(remote, n"Reload"); this.lastReloadEvent = reloadEvent; };
+        let meleeEvent: Int32 = CPMRemoteMeleeEvent(this.playerID);
+        if meleeEvent != this.lastMeleeEvent { AnimationControllerComponent.PushEvent(remote, n"MeleeAttack"); this.lastMeleeEvent = meleeEvent; };
     }
 
     private func Spawn() -> Void {
@@ -96,11 +166,11 @@ public class CPMRemoteVisual extends IScriptable {
     }
 
     private func UpdateLocomotion(remote: ref<NPCPuppet>, target: Vector4) -> Void {
-        let velocity: Float = CPMRemoteVelocity(this.playerID);
         let requestedState: Int32 = 0;
-        if velocity > 0.20 {
-            if velocity >= 4.20 { requestedState = 2; } else { requestedState = 1; };
-        };
+        let networkLocomotion: Int32 = CPMRemoteLocomotion(this.playerID);
+        let detailed: Int32 = CPMRemoteDetailedLocomotion(this.playerID);
+        if networkLocomotion == 2 || networkLocomotion == 11 || detailed == 4 || detailed == 30 { requestedState = 2; }
+        else { if CPMRemoteVelocity(this.playerID) > 0.20 { requestedState = 1; }; };
         if requestedState != this.locomotionCandidate {
             this.locomotionCandidate = requestedState;
             this.locomotionCandidateTicks = 1;
@@ -168,7 +238,19 @@ public class CPMTelemetryCallback extends DelayCallback {
         if IsDefined(this.player) {
             let position: Vector4 = this.player.GetWorldPosition();
             let forward: Vector4 = this.player.GetWorldForward();
-            CPMSubmitState(position.X, position.Y, position.Z, forward.X, forward.Y);
+            let blackboard: ref<IBlackboard> = this.player.GetPlayerStateMachineBlackboard();
+            let locomotion: Int32 = blackboard.GetInt(GetAllBlackboardDefs().PlayerStateMachine.Locomotion);
+            let detailedLocomotion: Int32 = blackboard.GetInt(GetAllBlackboardDefs().PlayerStateMachine.LocomotionDetailed);
+            let upperBody: Int32 = blackboard.GetInt(GetAllBlackboardDefs().PlayerStateMachine.UpperBody);
+            let weaponState: Int32 = blackboard.GetInt(GetAllBlackboardDefs().PlayerStateMachine.Weapon);
+            let meleeState: Int32 = blackboard.GetInt(GetAllBlackboardDefs().PlayerStateMachine.MeleeWeapon);
+            let activeWeapon: ref<WeaponObject> = GameObject.GetActiveWeapon(this.player);
+            let weaponType: Int32 = -1;
+            let weaponEquipped: Bool = IsDefined(activeWeapon);
+            if weaponEquipped { weaponType = EnumInt(activeWeapon.GetWeaponRecord().ItemType().Type()); };
+            CPMSubmitState(position.X, position.Y, position.Z, forward.X, forward.Y,
+                forward.X, forward.Y, forward.Z, locomotion, detailedLocomotion, upperBody,
+                weaponState, meleeState, weaponType, weaponEquipped, upperBody == 6);
             this.SynchronizeRemotes();
             GameInstance.GetDelaySystem(this.player.GetGame()).DelayCallback(this, 0.05);
         };

@@ -9,7 +9,7 @@ function writeCPMConnection(server) {
   fs.writeFileSync(path.join(folder, 'connection.json'), JSON.stringify({
     address: server.ip,
     port: Number(server.port),
-    protocolVersion: 1,
+    protocolVersion: 2,
     serverName: server.name || `${server.ip}:${server.port}`,
     selectedAt: new Date().toISOString()
   }, null, 2));
