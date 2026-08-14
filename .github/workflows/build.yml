@@ -1,20 +1,21 @@
-name: Build CPM 0.0.7 Hybrid Interpolation
+name: Build CPM 0.0.8 Multi Remote
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build:
-    name: Compilar CPM 0.0.7
+    name: Compilar CPM 0.0.8
     runs-on: windows-2022
 
     steps:
       - name: Baixar codigo
         uses: actions/checkout@v4
 
-      - name: Validar fontes 0.0.7
+      - name: Validar fontes 0.0.8
         shell: powershell
         run: |
           $required = @(
@@ -27,7 +28,10 @@ jobs:
             "src\Protocol.hpp",
             "server\Main.cpp",
             "resources\r6\scripts\CPM\CPMClient.reds",
-            "tools\CPM-Hybrid-Interpolation-Test-0.0.7.ps1",
+            "tools\CPM-Multi-Remote-Test-0.0.8.ps1",
+            "tools\CPM-Test-Server-0.0.2.ps1",
+            "tools\CPM-Player-Simulator-0.0.3.ps1",
+            "tools\CPM-10-Players-Big-Test-0.0.4.ps1",
             "Start-Visual-Test.ps1",
             "Start-Big-Test.ps1",
             "connection.example.json",
@@ -47,24 +51,30 @@ jobs:
 
           $cmake = Get-Content "CMakeLists.txt" -Raw
 
-          if ($cmake -notmatch "VERSION 0\.0\.7") {
-            throw "CMakeLists.txt nao corresponde a 0.0.7."
+          if ($cmake -notmatch "VERSION 0\.0\.8") {
+            throw "CMakeLists.txt nao corresponde ao CPM 0.0.8."
           }
 
-          $client = Get-Content "src\Main.cpp" -Raw
+          $clientMain = Get-Content "src\Main.cpp" -Raw
 
-          if ($client -notmatch "0\.0\.7 Hybrid Interpolation") {
-            throw "src/Main.cpp nao corresponde a 0.0.7."
+          if ($clientMain -notmatch "0\.0\.8 Multi Remote") {
+            throw "src/Main.cpp nao corresponde ao CPM Client 0.0.8."
           }
 
-          if ($client -notmatch "SEMVER\(0,0,7\)") {
-            throw "Metadata da DLL nao corresponde a 0.0.7."
+          if ($clientMain -notmatch "SEMVER\(0,0,8\)") {
+            throw "A versao interna da CPMClient.dll nao corresponde a 0.0.8."
           }
 
-          $server = Get-Content "server\Main.cpp" -Raw
+          $clientNetwork = Get-Content "src\Client.cpp" -Raw
 
-          if ($server -notmatch "0\.0\.7 HYBRID INTERPOLATION") {
-            throw "server/Main.cpp nao corresponde a 0.0.7."
+          if ($clientNetwork -notmatch "CPM 0\.0\.8 conectando") {
+            throw "src/Client.cpp nao corresponde ao CPM 0.0.8."
+          }
+
+          $serverMain = Get-Content "server\Main.cpp" -Raw
+
+          if ($serverMain -notmatch "0\.0\.8 MULTI REMOTE") {
+            throw "server/Main.cpp nao corresponde ao CPM Server 0.0.8."
           }
 
           $script = Get-Content `
@@ -75,58 +85,101 @@ jobs:
           }
 
           if ($script -match 'movementType\s*=\s*n"(Sprint|Walk)"') {
-            throw "movementType ainda usa CName invalido."
+            throw "movementType ainda utiliza CName invalido."
           }
 
-          if (
-            $script -notmatch "moveMovementType\.Sprint" -or
-            $script -notmatch "moveMovementType\.Walk"
-          ) {
-            throw "Enums Walk/Sprint ausentes."
+          if ($script -notmatch "moveMovementType\.Sprint") {
+            throw "Enum de corrida Sprint nao encontrado."
+          }
+
+          if ($script -notmatch "moveMovementType\.Walk") {
+            throw "Enum de caminhada Walk nao encontrado."
+          }
+
+          if ($script -notmatch "class CPMRemoteVisual") {
+            throw "Controlador visual individual CPMRemoteVisual ausente."
+          }
+
+          if ($script -notmatch 'array<ref<CPMRemoteVisual>>') {
+            throw "Colecao de jogadores remotos ausente."
+          }
+
+          if ($script -notmatch "SynchronizeRemotes") {
+            throw "Sincronizacao de varios jogadores ausente."
+          }
+
+          if ($script -notmatch "ContainsRemote") {
+            throw "Controle de duplicacao de jogadores ausente."
+          }
+
+          if ($script -notmatch "ArrayErase") {
+            throw "Remocao individual de jogadores ausente."
           }
 
           if ($script -notmatch "InterpolateTransform") {
             throw "Interpolacao visual direta ausente."
           }
 
-          if ($script -notmatch `
-            "this\.visualPosition\.X \+= dx \* 0\.18") {
-            throw "Suavizacao de posicao ausente."
+          if (
+            $script -notmatch
+            "this\.visualPosition\.X \+= dx \* 0\.18"
+          ) {
+            throw "Suavizacao estavel da versao 0.0.7 foi removida."
           }
 
-          if ($script -notmatch "StartLocomotionAnimation") {
-            throw "Comando auxiliar de locomocao ausente."
+          if (
+            $script -notmatch
+            "this\.visualPosition\.Y \+= dy \* 0\.18"
+          ) {
+            throw "Suavizacao do eixo Y ausente."
           }
 
-          if ($script -match "activeMoveCommand|UpdateMoveTarget") {
-            throw "Logica Continuous Path antiga encontrada."
+          if (
+            $script -notmatch
+            "this\.visualPosition\.Z \+= dz \* 0\.18"
+          ) {
+            throw "Suavizacao do eixo Z ausente."
           }
 
-          if ($script -match "distanceSquared > 2\.25") {
-            throw "Teleporte corretivo antigo ainda esta presente."
+          if ($script -notmatch "this\.visualYaw \+= yawDelta \* 0\.18") {
+            throw "Interpolacao da rotacao ausente."
           }
 
           if ($script -notmatch "distanceSquared > 225\.0") {
             throw "Recuperacao extrema de 15 metros ausente."
           }
 
-          if ($script -match "DisableCollider") {
-            throw "Colisao ainda esta desabilitada."
+          if ($script -match "distanceSquared > 2\.25") {
+            throw "Teleporte corretivo antigo ainda esta presente."
           }
 
           if ($script -notmatch "locomotionCandidateTicks >= 10") {
-            throw "Histerese de locomocao ausente."
+            throw "Histerese da locomocao ausente."
+          }
+
+          if ($script -notmatch "StartLocomotionAnimation") {
+            throw "Controle auxiliar de animacao ausente."
+          }
+
+          if ($script -match "activeMoveCommand|UpdateMoveTarget") {
+            throw "Logica antiga Continuous Path encontrada."
+          }
+
+          if ($script -match "DisableCollider") {
+            throw "Desativacao antiga de colisao encontrada."
           }
 
           $starter = Get-Content "Start-Visual-Test.ps1" -Raw
 
-          if ($starter -notmatch `
-            "CPM-Hybrid-Interpolation-Test-0\.0\.7\.ps1") {
-            throw "Start-Visual-Test aponta para simulador errado."
+          if (
+            $starter -notmatch
+            "CPM-Multi-Remote-Test-0\.0\.8\.ps1"
+          ) {
+            throw "Start-Visual-Test.ps1 aponta para o teste errado."
           }
 
           Write-Host ""
-          Write-Host "FONTES CPM 0.0.7 VALIDADAS" `
+          Write-Host "Fontes CPM 0.0.8 validadas." `
             -ForegroundColor Green
           Write-Host ""
 
@@ -145,7 +198,7 @@ jobs:
           cmake --build build --config Release
 
           if ($LASTEXITCODE -ne 0) {
-            throw "Falha ao compilar o CPM 0.0.7."
+            throw "Falha ao compilar o CPM 0.0.8."
           }
 
       - name: Verificar binarios
@@ -177,13 +230,16 @@ jobs:
           }
 
           New-Item -ItemType Directory -Force `
-            -Path "package\red4ext\plugins\CPMClient" | Out-Null
+            -Path "package\red4ext\plugins\CPMClient" |
+            Out-Null
 
           New-Item -ItemType Directory -Force `
-            -Path "package\r6\scripts\CPM" | Out-Null
+            -Path "package\r6\scripts\CPM" |
+            Out-Null
 
           New-Item -ItemType Directory -Force `
-            -Path "package\tools" | Out-Null
+            -Path "package\tools" |
+            Out-Null
 
           Copy-Item `
             "build\Release\CPMClient.dll" `
@@ -201,8 +257,8 @@ jobs:
             -Force
 
           Copy-Item `
-            "tools\CPM-Hybrid-Interpolation-Test-0.0.7.ps1" `
-            "package\tools\CPM-Hybrid-Interpolation-Test-0.0.7.ps1" `
+            "tools\CPM-Multi-Remote-Test-0.0.8.ps1" `
+            "package\tools\CPM-Multi-Remote-Test-0.0.8.ps1" `
             -Force
 
           Copy-Item `
@@ -252,7 +308,7 @@ jobs:
             "package\red4ext\plugins\CPMClient\CPMClient.dll",
             "package\r6\scripts\CPM\CPMClient.reds",
             "package\CPMServer.exe",
-            "package\tools\CPM-Hybrid-Interpolation-Test-0.0.7.ps1",
+            "package\tools\CPM-Multi-Remote-Test-0.0.8.ps1",
             "package\tools\CPM-Test-Server-0.0.2.ps1",
             "package\tools\CPM-Player-Simulator-0.0.3.ps1",
             "package\tools\CPM-10-Players-Big-Test-0.0.4.ps1",
@@ -273,74 +329,80 @@ jobs:
             }
           }
 
-          $oldVisualTests = Get-ChildItem `
-            "package\tools" -File |
-            Where-Object {
-              $_.Name -match `
-                "CPM-(Visual-Player-Test-0\.0\.5|Smooth-Sync-Test-0\.0\.6\.[012]|Persistent-Movement-Test-0\.0\.6\.3|Continuous-Path-Test-0\.0\.6\.4)"
-            }
+          $forbiddenFiles = @(
+            "package\tools\CPM-Hybrid-Interpolation-Test-0.0.7.ps1",
+            "package\tools\CPM-Visual-Player-Test-0.0.5.ps1",
+            "package\tools\CPM-Visual-Player-Test-0.0.5.1.ps1",
+            "package\tools\CPM-Visual-Player-Test-0.0.5.2.ps1",
+            "package\tools\CPM-Smooth-Sync-Test-0.0.6.ps1",
+            "package\tools\CPM-Smooth-Sync-Test-0.0.6.1.ps1",
+            "package\tools\CPM-Smooth-Sync-Test-0.0.6.2.ps1"
+          )
 
-          if ($oldVisualTests) {
-            throw "Teste visual antigo encontrado: $($oldVisualTests.Name -join ', ')"
+          foreach ($file in $forbiddenFiles) {
+            if (Test-Path $file) {
+              throw "Arquivo antigo encontrado no pacote: $file"
+            }
           }
 
-          $script = Get-Content `
+          $packagedScript = Get-Content `
             "package\r6\scripts\CPM\CPMClient.reds" -Raw
 
-          if ($script -match "ref<AIPositionSpec>") {
-            throw "Pacote contem AIPositionSpec declarado como ref."
+          if (
+            $packagedScript -notmatch "class CPMRemoteVisual" -or
+            $packagedScript -notmatch "SynchronizeRemotes" -or
+            $packagedScript -notmatch
+              'array<ref<CPMRemoteVisual>>'
+          ) {
+            throw "Pacote nao contem o suporte Multi Remote."
           }
 
-          if ($script -match `
-            'movementType\s*=\s*n"(Sprint|Walk)"') {
-            throw "Pacote contem movementType usando CName."
+          if (
+            $packagedScript -notmatch "InterpolateTransform" -or
+            $packagedScript -notmatch
+              "GameInstance\.GetTeleportationFacility"
+          ) {
+            throw "Interpolacao visual nao encontrada no pacote."
           }
 
-          if ($script -match "distanceSquared > 2\.25") {
-            throw "Pacote contem teleporte corretivo antigo."
+          if (
+            $packagedScript -match "distanceSquared > 2\.25" -or
+            $packagedScript -match "DisableCollider" -or
+            $packagedScript -match
+              'movementType\s*=\s*n"(Sprint|Walk)"'
+          ) {
+            throw "Pacote contem codigo antigo ou incompatível."
           }
 
-          if ($script -match "DisableCollider") {
-            throw "Pacote contem colisao desabilitada."
+          if (
+            $packagedScript -match
+              "activeMoveCommand|UpdateMoveTarget"
+          ) {
+            throw "Pacote contem o controlador antigo."
           }
 
-          if ($script -notmatch "InterpolateTransform") {
-            throw "Pacote nao contem interpolacao visual direta."
-          }
-
-          if ($script -notmatch `
-            "GameInstance\.GetTeleportationFacility") {
-            throw "Pacote nao aplica a transformacao interpolada."
-          }
-
-          if ($script -notmatch "StartLocomotionAnimation") {
-            throw "Pacote nao contem controle auxiliar de locomocao."
-          }
-
-          if ($script -match "activeMoveCommand|UpdateMoveTarget") {
-            throw "Pacote contem logica antiga da versao 0.0.6.4."
-          }
-
-          $starter = Get-Content `
+          $packagedStarter = Get-Content `
             "package\Start-Visual-Test.ps1" -Raw
 
-          if ($starter -notmatch `
-            "CPM-Hybrid-Interpolation-Test-0\.0\.7\.ps1") {
-            throw "Start-Visual-Test do pacote aponta para versao errada."
+          if (
+            $packagedStarter -notmatch
+              "CPM-Multi-Remote-Test-0\.0\.8\.ps1"
+          ) {
+            throw "Start-Visual-Test do pacote aponta para teste errado."
           }
 
           Write-Host ""
-          Write-Host "PACOTE CPM 0.0.7 VALIDADO COM SUCESSO" `
+          Write-Host "PACOTE CPM 0.0.8 VALIDADO COM SUCESSO" `
             -ForegroundColor Green
           Write-Host ""
 
           Get-ChildItem "package" -Recurse |
             Select-Object FullName, Length, LastWriteTime
 
-      - name: Enviar CPM 0.0.7 Hybrid Interpolation
+      - name: Enviar CPM 0.0.8 Multi Remote
         uses: actions/upload-artifact@v4
         with:
-          name: CPM-Windows-0.0.7-Hybrid-Interpolation
+          name: CPM-Windows-0.0.8-Multi-Remote
           path: package
           if-no-files-found: error
           retention-days: 30
