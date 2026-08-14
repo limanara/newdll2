@@ -1,13 +1,14 @@
-# CPM 0.0.7 — Hybrid Interpolation
+# CPM 0.0.8 — Multi Remote
 
-Protótipo híbrido criado após a análise em vídeo dos testes 0.0.6.x. A posição
-e a rotação são interpoladas diretamente; a IA não escolhe mais o trajeto.
+Evolução da base estável 0.0.7. A interpolação fluida validada foi preservada,
+mas agora cada jogador remoto recebe sua própria entidade e estado visual.
 
 ## O que esta versão testa
 
 - API nativa de consulta dos jogadores remotos
 - criação segura de uma entidade dinâmica pelo Codeware
-- modelo humano padrão para o primeiro jogador remoto
+- criação simultânea de vários jogadores remotos
+- controlador visual independente por jogador
 - recepção de posição e rotação a cada 50 ms
 - interpolação exponencial da transformação visual a cada 50 ms
 - comando auxiliar enviado somente na troca entre Walk e Sprint
@@ -18,9 +19,9 @@ e a rotação são interpoladas diretamente; a IA não escolhe mais o trajeto.
 - remoção automática da entidade após a desconexão
 - toda a rede, sessões, heartbeat e reconexão do CPM 0.0.4
 
-Nesta etapa somente o primeiro jogador remoto é renderizado. O objetivo é
-validar se a árvore locomotiva permanece ativa enquanto a transformação é
-interpolada. Esta ainda não é a animação nativa multiplayer definitiva.
+O teste incluído conecta cinco jogadores simulados ao mesmo tempo. Eles devem
+aparecer em formação, permanecer parados, caminhar, correr, percorrer curvas e
+ser removidos individualmente após o timeout.
 
 ## Requisitos
 
@@ -36,10 +37,10 @@ existe e o jogo não carregará o script.
 
 ## Compilação no GitHub
 
-Execute o workflow **Build CPM 0.0.7 Hybrid Interpolation** e baixe:
+Execute o workflow **Build CPM 0.0.8 Multi Remote** e baixe:
 
 ```text
-CPM-Windows-0.0.7-Hybrid-Interpolation
+CPM-Windows-0.0.8-Multi-Remote
 ```
 
 ## Instalação
@@ -65,15 +66,15 @@ powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
    Use um save de teste: o modelo desta fase é apenas um marcador visual e
    ainda conserva comportamentos nativos de NPC.
 4. Permaneça em qualquer local seguro do mapa. O NPC será criado
-   aproximadamente 3 metros à frente do seu personagem.
+   à frente do seu personagem.
 5. Volte ao PowerShell e pressione ENTER. O inicializador executará:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Hybrid-Interpolation-Test-0.0.7.ps1"
+powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Multi-Remote-Test-0.0.8.ps1"
 ```
 
-Um NPC deverá ficar parado, caminhar, correr e percorrer uma curva. Ao final, o
-servidor removerá o jogador por timeout e o NPC desaparecerá em até 15 segundos.
+Cinco NPCs deverão ficar parados, caminhar, correr e percorrer curvas. Ao final,
+o servidor removerá os jogadores por timeout e todos desaparecerão.
 
 As coordenadas enviadas pelo simulador são tratadas como deslocamento relativo.
 No instante da conexão, o CPM captura a posição atual do jogador real e usa esse
