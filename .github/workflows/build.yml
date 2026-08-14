@@ -1,4 +1,4 @@
-name: Build CPM 0.0.8 Multi Remote
+name: Build CPM 0.1.0 States Combat
 
 on:
   workflow_dispatch:
@@ -8,17 +8,17 @@ on:
 
 jobs:
   build:
-    name: Compilar CPM 0.0.8
+    name: Compilar CPM 0.1.0
     runs-on: windows-2022
 
     steps:
       - name: Baixar codigo
         uses: actions/checkout@v4
 
-      - name: Validar fontes 0.0.8
+      - name: Validar fontes CPM 0.1.0
         shell: powershell
         run: |
-          $required = @(
+          $requiredSources = @(
             "CMakeLists.txt",
             "src\Main.cpp",
             "src\Client.cpp",
@@ -28,18 +28,14 @@ jobs:
             "src\Protocol.hpp",
             "server\Main.cpp",
             "resources\r6\scripts\CPM\CPMClient.reds",
-            "tools\CPM-Multi-Remote-Test-0.0.8.ps1",
-            "tools\CPM-Test-Server-0.0.2.ps1",
-            "tools\CPM-Player-Simulator-0.0.3.ps1",
-            "tools\CPM-10-Players-Big-Test-0.0.4.ps1",
+            "tools\CPM-States-Combat-Test-0.1.0.ps1",
             "Start-Visual-Test.ps1",
-            "Start-Big-Test.ps1",
             "connection.example.json",
             "install-client.bat",
             "README.md"
           )
 
-          foreach ($file in $required) {
+          foreach ($file in $requiredSources) {
             if (!(Test-Path $file -PathType Leaf)) {
               throw "Arquivo fonte obrigatorio ausente: $file"
             }
@@ -51,121 +47,137 @@ jobs:
 
           $cmake = Get-Content "CMakeLists.txt" -Raw
 
-          if ($cmake -notmatch "VERSION 0\.0\.8") {
-            throw "CMakeLists.txt nao corresponde ao CPM 0.0.8."
+          if ($cmake -notmatch "VERSION 0\.1\.0") {
+            throw "CMakeLists.txt nao corresponde ao CPM 0.1.0."
           }
 
           $clientMain = Get-Content "src\Main.cpp" -Raw
 
-          if ($clientMain -notmatch "0\.0\.8 Multi Remote") {
-            throw "src/Main.cpp nao corresponde ao CPM Client 0.0.8."
+          if ($clientMain -notmatch "0\.1\.0 Estados e Combate") {
+            throw "src/Main.cpp nao corresponde ao CPM Client 0.1.0."
           }
 
-          if ($clientMain -notmatch "SEMVER\(0,0,8\)") {
-            throw "A versao interna da CPMClient.dll nao corresponde a 0.0.8."
+          if ($clientMain -notmatch "SEMVER\(0,1,0\)") {
+            throw "A versao interna da CPMClient.dll nao corresponde a 0.1.0."
           }
 
           $clientNetwork = Get-Content "src\Client.cpp" -Raw
 
-          if ($clientNetwork -notmatch "CPM 0\.0\.8 conectando") {
-            throw "src/Client.cpp nao corresponde ao CPM 0.0.8."
+          if ($clientNetwork -notmatch "0\.1\.0 Estados e Combate") {
+            throw "src/Client.cpp nao corresponde ao CPM 0.1.0."
           }
 
           $serverMain = Get-Content "server\Main.cpp" -Raw
 
-          if ($serverMain -notmatch "0\.0\.8 MULTI REMOTE") {
-            throw "server/Main.cpp nao corresponde ao CPM Server 0.0.8."
+          if ($serverMain -notmatch "0\.1\.0 ESTADOS \+ COMBATE") {
+            throw "server/Main.cpp nao corresponde ao CPM Server 0.1.0."
           }
 
-          $script = Get-Content `
+          $protocol = Get-Content "src\Protocol.hpp" -Raw
+
+          if ($protocol -notmatch "Version=2") {
+            throw "O protocolo CPM nao esta configurado na versao 2."
+          }
+
+          if ($protocol -notmatch "sizeof\(PlayerState\)==66") {
+            throw "A validacao de 66 bytes do PlayerState v2 esta ausente."
+          }
+
+          $protocolFields = @(
+            "aimX",
+            "aimY",
+            "aimZ",
+            "locomotion",
+            "detailedLocomotion",
+            "upperBody",
+            "weaponState",
+            "meleeState",
+            "weaponType",
+            "shotEvent",
+            "reloadEvent",
+            "meleeEvent"
+          )
+
+          foreach ($field in $protocolFields) {
+            if ($protocol -notmatch $field) {
+              throw "Campo ausente no protocolo v2: $field"
+            }
+          }
+
+          $native = Get-Content "src\Native.cpp" -Raw
+
+          $nativeFunctions = @(
+            "CPMRemoteDetailedLocomotion",
+            "CPMRemoteUpperBody",
+            "CPMRemoteWeaponState",
+            "CPMRemoteMeleeState",
+            "CPMRemoteWeaponType",
+            "CPMRemoteWeaponEquipped",
+            "CPMRemoteAiming",
+            "CPMRemoteShotEvent",
+            "CPMRemoteReloadEvent",
+            "CPMRemoteMeleeEvent"
+          )
+
+          foreach ($function in $nativeFunctions) {
+            if ($native -notmatch $function) {
+              throw "Funcao nativa ausente: $function"
+            }
+          }
+
+          $redscript = Get-Content `
             "resources\r6\scripts\CPM\CPMClient.reds" -Raw
 
-          if ($script -match "ref<AIPositionSpec>") {
+          $redscriptFeatures = @(
+            "LocomotionDetailed",
+            "CPMRemoteShotEvent",
+            "CPMRemoteReloadEvent",
+            "CPMRemoteMeleeEvent",
+            "AnimFeature_Stance",
+            "AnimFeature_Aim",
+            'n"Jump"',
+            'n"Land"',
+            'n"Shoot"',
+            'n"Reload"',
+            "InterpolateTransform",
+            "SynchronizeRemotes"
+          )
+
+          foreach ($feature in $redscriptFeatures) {
+            if ($redscript -notmatch $feature) {
+              throw "Recurso REDscript ausente: $feature"
+            }
+          }
+
+          if ($redscript -match "ref<AIPositionSpec>") {
             throw "AIPositionSpec foi declarado incorretamente como ref."
           }
 
-          if ($script -match 'movementType\s*=\s*n"(Sprint|Walk)"') {
-            throw "movementType ainda utiliza CName invalido."
+          if ($redscript -match 'movementType\s*=\s*n"(Sprint|Walk)"') {
+            throw "movementType utiliza CName invalido."
           }
 
-          if ($script -notmatch "moveMovementType\.Sprint") {
-            throw "Enum de corrida Sprint nao encontrado."
+          if ($redscript -notmatch "moveMovementType\.Sprint") {
+            throw "Enum Sprint ausente."
           }
 
-          if ($script -notmatch "moveMovementType\.Walk") {
-            throw "Enum de caminhada Walk nao encontrado."
+          if ($redscript -notmatch "moveMovementType\.Walk") {
+            throw "Enum Walk ausente."
           }
 
-          if ($script -notmatch "class CPMRemoteVisual") {
-            throw "Controlador visual individual CPMRemoteVisual ausente."
-          }
-
-          if ($script -notmatch 'array<ref<CPMRemoteVisual>>') {
-            throw "Colecao de jogadores remotos ausente."
-          }
-
-          if ($script -notmatch "SynchronizeRemotes") {
-            throw "Sincronizacao de varios jogadores ausente."
-          }
-
-          if ($script -notmatch "ContainsRemote") {
-            throw "Controle de duplicacao de jogadores ausente."
-          }
-
-          if ($script -notmatch "ArrayErase") {
-            throw "Remocao individual de jogadores ausente."
-          }
-
-          if ($script -notmatch "InterpolateTransform") {
-            throw "Interpolacao visual direta ausente."
-          }
-
-          if (
-            $script -notmatch
-            "this\.visualPosition\.X \+= dx \* 0\.18"
-          ) {
-            throw "Suavizacao estavel da versao 0.0.7 foi removida."
-          }
-
-          if (
-            $script -notmatch
-            "this\.visualPosition\.Y \+= dy \* 0\.18"
-          ) {
-            throw "Suavizacao do eixo Y ausente."
-          }
-
-          if (
-            $script -notmatch
-            "this\.visualPosition\.Z \+= dz \* 0\.18"
-          ) {
-            throw "Suavizacao do eixo Z ausente."
-          }
-
-          if ($script -notmatch "this\.visualYaw \+= yawDelta \* 0\.18") {
-            throw "Interpolacao da rotacao ausente."
-          }
-
-          if ($script -notmatch "distanceSquared > 225\.0") {
+          if ($redscript -notmatch "distanceSquared > 225\.0") {
             throw "Recuperacao extrema de 15 metros ausente."
           }
 
-          if ($script -match "distanceSquared > 2\.25") {
-            throw "Teleporte corretivo antigo ainda esta presente."
+          if ($redscript -match "distanceSquared > 2\.25") {
+            throw "Teleporte corretivo antigo encontrado."
           }
 
-          if ($script -notmatch "locomotionCandidateTicks >= 10") {
-            throw "Histerese da locomocao ausente."
-          }
-
-          if ($script -notmatch "StartLocomotionAnimation") {
-            throw "Controle auxiliar de animacao ausente."
-          }
-
-          if ($script -match "activeMoveCommand|UpdateMoveTarget") {
+          if ($redscript -match "activeMoveCommand|UpdateMoveTarget") {
             throw "Logica antiga Continuous Path encontrada."
           }
 
-          if ($script -match "DisableCollider") {
+          if ($redscript -match "DisableCollider") {
             throw "Desativacao antiga de colisao encontrada."
           }
 
@@ -173,13 +185,32 @@ jobs:
 
           if (
             $starter -notmatch
-            "CPM-Multi-Remote-Test-0\.0\.8\.ps1"
+            "CPM-States-Combat-Test-0\.1\.0\.ps1"
           ) {
             throw "Start-Visual-Test.ps1 aponta para o teste errado."
           }
 
+          $simulator = Get-Content `
+            "tools\CPM-States-Combat-Test-0.1.0.ps1" -Raw
+
+          if ($simulator -notmatch "New-CPMPacket 3 66") {
+            throw "Simulador nao utiliza PlayerState de 66 bytes."
+          }
+
+          if ($simulator -notmatch "packet\.Count -ne 78") {
+            throw "Simulador nao valida o pacote completo de 78 bytes."
+          }
+
+          $connection = Get-Content `
+            "connection.example.json" -Raw |
+            ConvertFrom-Json
+
+          if ($connection.protocolVersion -ne 2) {
+            throw "connection.example.json nao utiliza o protocolo 2."
+          }
+
           Write-Host ""
-          Write-Host "Fontes CPM 0.0.8 validadas." `
+          Write-Host "FONTES CPM 0.1.0 VALIDADAS" `
             -ForegroundColor Green
           Write-Host ""
 
@@ -198,7 +229,7 @@ jobs:
           cmake --build build --config Release
 
           if ($LASTEXITCODE -ne 0) {
-            throw "Falha ao compilar o CPM 0.0.8."
+            throw "Falha ao compilar o CPM 0.1.0."
           }
 
       - name: Verificar binarios
@@ -211,7 +242,7 @@ jobs:
 
           foreach ($file in $binaries) {
             if (!(Test-Path $file -PathType Leaf)) {
-              throw "Binario obrigatorio nao foi gerado: $file"
+              throw "Binario nao foi gerado: $file"
             }
 
             if ((Get-Item $file).Length -le 0) {
@@ -257,33 +288,13 @@ jobs:
             -Force
 
           Copy-Item `
-            "tools\CPM-Multi-Remote-Test-0.0.8.ps1" `
-            "package\tools\CPM-Multi-Remote-Test-0.0.8.ps1" `
-            -Force
-
-          Copy-Item `
-            "tools\CPM-Test-Server-0.0.2.ps1" `
-            "package\tools\CPM-Test-Server-0.0.2.ps1" `
-            -Force
-
-          Copy-Item `
-            "tools\CPM-Player-Simulator-0.0.3.ps1" `
-            "package\tools\CPM-Player-Simulator-0.0.3.ps1" `
-            -Force
-
-          Copy-Item `
-            "tools\CPM-10-Players-Big-Test-0.0.4.ps1" `
-            "package\tools\CPM-10-Players-Big-Test-0.0.4.ps1" `
+            "tools\CPM-States-Combat-Test-0.1.0.ps1" `
+            "package\tools\CPM-States-Combat-Test-0.1.0.ps1" `
             -Force
 
           Copy-Item `
             "Start-Visual-Test.ps1" `
             "package\Start-Visual-Test.ps1" `
-            -Force
-
-          Copy-Item `
-            "Start-Big-Test.ps1" `
-            "package\Start-Big-Test.ps1" `
             -Force
 
           Copy-Item `
@@ -306,14 +317,10 @@ jobs:
         run: |
           $requiredPackageFiles = @(
             "package\red4ext\plugins\CPMClient\CPMClient.dll",
-            "package\r6\scripts\CPM\CPMClient.reds",
             "package\CPMServer.exe",
-            "package\tools\CPM-Multi-Remote-Test-0.0.8.ps1",
-            "package\tools\CPM-Test-Server-0.0.2.ps1",
-            "package\tools\CPM-Player-Simulator-0.0.3.ps1",
-            "package\tools\CPM-10-Players-Big-Test-0.0.4.ps1",
+            "package\r6\scripts\CPM\CPMClient.reds",
+            "package\tools\CPM-States-Combat-Test-0.1.0.ps1",
             "package\Start-Visual-Test.ps1",
-            "package\Start-Big-Test.ps1",
             "package\connection.example.json",
             "package\install-client.bat",
             "package\README.md"
@@ -321,7 +328,7 @@ jobs:
 
           foreach ($file in $requiredPackageFiles) {
             if (!(Test-Path $file -PathType Leaf)) {
-              throw "Arquivo obrigatorio ausente no pacote: $file"
+              throw "Arquivo ausente no pacote: $file"
             }
 
             if ((Get-Item $file).Length -le 0) {
@@ -329,80 +336,51 @@ jobs:
             }
           }
 
-          $forbiddenFiles = @(
-            "package\tools\CPM-Hybrid-Interpolation-Test-0.0.7.ps1",
-            "package\tools\CPM-Visual-Player-Test-0.0.5.ps1",
-            "package\tools\CPM-Visual-Player-Test-0.0.5.1.ps1",
-            "package\tools\CPM-Visual-Player-Test-0.0.5.2.ps1",
-            "package\tools\CPM-Smooth-Sync-Test-0.0.6.ps1",
-            "package\tools\CPM-Smooth-Sync-Test-0.0.6.1.ps1",
-            "package\tools\CPM-Smooth-Sync-Test-0.0.6.2.ps1"
-          )
-
-          foreach ($file in $forbiddenFiles) {
-            if (Test-Path $file) {
-              throw "Arquivo antigo encontrado no pacote: $file"
-            }
-          }
-
-          $packagedScript = Get-Content `
-            "package\r6\scripts\CPM\CPMClient.reds" -Raw
-
-          if (
-            $packagedScript -notmatch "class CPMRemoteVisual" -or
-            $packagedScript -notmatch "SynchronizeRemotes" -or
-            $packagedScript -notmatch
-              'array<ref<CPMRemoteVisual>>'
-          ) {
-            throw "Pacote nao contem o suporte Multi Remote."
-          }
-
-          if (
-            $packagedScript -notmatch "InterpolateTransform" -or
-            $packagedScript -notmatch
-              "GameInstance\.GetTeleportationFacility"
-          ) {
-            throw "Interpolacao visual nao encontrada no pacote."
-          }
-
-          if (
-            $packagedScript -match "distanceSquared > 2\.25" -or
-            $packagedScript -match "DisableCollider" -or
-            $packagedScript -match
-              'movementType\s*=\s*n"(Sprint|Walk)"'
-          ) {
-            throw "Pacote contem codigo antigo ou incompatível."
-          }
-
-          if (
-            $packagedScript -match
-              "activeMoveCommand|UpdateMoveTarget"
-          ) {
-            throw "Pacote contem o controlador antigo."
-          }
-
           $packagedStarter = Get-Content `
             "package\Start-Visual-Test.ps1" -Raw
 
           if (
             $packagedStarter -notmatch
-              "CPM-Multi-Remote-Test-0\.0\.8\.ps1"
+            "CPM-States-Combat-Test-0\.1\.0\.ps1"
           ) {
-            throw "Start-Visual-Test do pacote aponta para teste errado."
+            throw "Start-Visual-Test do pacote aponta para teste incorreto."
+          }
+
+          $packagedConnection = Get-Content `
+            "package\connection.example.json" -Raw |
+            ConvertFrom-Json
+
+          if ($packagedConnection.protocolVersion -ne 2) {
+            throw "Configuracao final nao utiliza protocolo 2."
+          }
+
+          $packagedScript = Get-Content `
+            "package\r6\scripts\CPM\CPMClient.reds" -Raw
+
+          if ($packagedScript -notmatch "CPMRemoteShotEvent") {
+            throw "Sistema de tiro ausente no REDscript final."
+          }
+
+          if ($packagedScript -notmatch "CPMRemoteReloadEvent") {
+            throw "Sistema de recarga ausente no REDscript final."
+          }
+
+          if ($packagedScript -notmatch "CPMRemoteMeleeEvent") {
+            throw "Sistema melee ausente no REDscript final."
           }
 
           Write-Host ""
-          Write-Host "PACOTE CPM 0.0.8 VALIDADO COM SUCESSO" `
+          Write-Host "PACOTE CPM 0.1.0 VALIDADO COM SUCESSO" `
             -ForegroundColor Green
           Write-Host ""
 
           Get-ChildItem "package" -Recurse |
             Select-Object FullName, Length, LastWriteTime
 
-      - name: Enviar CPM 0.0.8 Multi Remote
+      - name: Enviar CPM 0.1.0 States Combat
         uses: actions/upload-artifact@v4
         with:
-          name: CPM-Windows-0.0.8-Multi-Remote
+          name: CPM-Windows-0.1.0-States-Combat
           path: package
           if-no-files-found: error
           retention-days: 30
