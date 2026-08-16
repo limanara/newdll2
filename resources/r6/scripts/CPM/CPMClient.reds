@@ -225,7 +225,8 @@ public class CPMRemoteVisual extends IScriptable {
     }
 
     private func PlayerReference() -> EntityReference {
-        return CreateEntityReference("#player", nullArrayOfNames);
+        let communityEntryNames: array<CName>;
+        return CreateEntityReference("#player", communityEntryNames);
     }
 
     private func StartAim(remote: ref<NPCPuppet>) -> Void {
