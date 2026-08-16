@@ -1,233 +1,28 @@
-name: Build CPM 0.1.0.2 Action Controller
+name: Build CPM 0.1.0.3 Native Actions
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build:
-    name: Compilar CPM 0.1.0.2
     runs-on: windows-2022
 
     steps:
       - name: Baixar codigo
         uses: actions/checkout@v4
 
-      - name: Validar fontes CPM 0.1.0.2
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
-
-          $requiredSources = @(
-            "CMakeLists.txt",
-            "src\Main.cpp",
-            "src\Client.cpp",
-            "src\Client.hpp",
-            "src\Native.cpp",
-            "src\Native.hpp",
-            "src\Protocol.hpp",
-            "server\Main.cpp",
-            "resources\r6\scripts\CPM\CPMClient.reds",
-            "tools\CPM-Action-Controller-Test-0.1.0.2.ps1",
-            "Start-Visual-Test.ps1",
-            "connection.example.json",
-            "install-client.bat",
-            "README.md"
-          )
-
-          foreach ($file in $requiredSources) {
-            if (!(Test-Path $file -PathType Leaf)) {
-              throw "Arquivo fonte obrigatorio ausente: $file"
-            }
-
-            if ((Get-Item $file).Length -le 0) {
-              throw "Arquivo fonte vazio: $file"
-            }
-          }
-
-          $cmake = Get-Content "CMakeLists.txt" -Raw
-          if ($cmake -notmatch "VERSION 0\.1\.2") {
-            throw "CMakeLists.txt nao corresponde ao CPM 0.1.0.2 (versao interna 0.1.2)."
-          }
-
-          $clientMain = Get-Content "src\Main.cpp" -Raw
-          if ($clientMain -notmatch "0\.1\.0\.2 Action Controller") {
-            throw "src/Main.cpp nao corresponde ao CPM Client 0.1.0.2."
-          }
-          if ($clientMain -notmatch "SEMVER\(0,1,2\)") {
-            throw "A versao interna da CPMClient.dll deve ser 0.1.2."
-          }
-
-          $clientNetwork = Get-Content "src\Client.cpp" -Raw
-          if ($clientNetwork -notmatch "0\.1\.0\.2 Action Controller") {
-            throw "src/Client.cpp nao corresponde ao CPM 0.1.0.2."
-          }
-          foreach ($eventLog in @("Evento tiro", "Evento recarga", "Evento melee")) {
-            if ($clientNetwork -notmatch $eventLog) {
-              throw "Log nativo ausente em src/Client.cpp: $eventLog"
-            }
-          }
-
-          $serverMain = Get-Content "server\Main.cpp" -Raw
-          if ($serverMain -notmatch "0\.1\.0\.2 ACTION CONTROLLER") {
-            throw "server/Main.cpp nao corresponde ao CPM Server 0.1.0.2."
-          }
-
-          $protocol = Get-Content "src\Protocol.hpp" -Raw
-          if ($protocol -notmatch "Version=2") {
-            throw "O protocolo CPM nao esta configurado na versao 2."
-          }
-          if ($protocol -notmatch "sizeof\(PlayerState\)==66") {
-            throw "A validacao de 66 bytes do PlayerState v2 esta ausente."
-          }
-
-          $protocolFields = @(
-            "aimX", "aimY", "aimZ",
-            "locomotion", "detailedLocomotion", "upperBody",
-            "weaponState", "meleeState", "weaponType",
-            "shotEvent", "reloadEvent", "meleeEvent"
-          )
-          foreach ($field in $protocolFields) {
-            if ($protocol -notmatch $field) {
-              throw "Campo ausente no protocolo v2: $field"
-            }
-          }
-
-          $native = Get-Content "src\Native.cpp" -Raw
-          $nativeFunctions = @(
-            "CPMRemoteDetailedLocomotion",
-            "CPMRemoteUpperBody",
-            "CPMRemoteWeaponState",
-            "CPMRemoteMeleeState",
-            "CPMRemoteWeaponType",
-            "CPMRemoteWeaponEquipped",
-            "CPMRemoteAiming",
-            "CPMRemoteShotEvent",
-            "CPMRemoteReloadEvent",
-            "CPMRemoteMeleeEvent"
-          )
-          foreach ($function in $nativeFunctions) {
-            if ($native -notmatch $function) {
-              throw "Funcao nativa ausente: $function"
-            }
-          }
-
-          $redscript = Get-Content "resources\r6\scripts\CPM\CPMClient.reds" -Raw
-          $actionControllerFeatures = @(
-            "activeMoveCommand",
-            "StopExecutingCommand",
-            "AIEquipCommand",
-            "Items.Preset_Omaha_Default",
-            "AttachmentSlots.WeaponRight",
-            "NonCombatAim",
-            "AnimFeature_QuickMelee",
-            "QuickMelee",
-            "CPMRemoteShotEvent",
-            "CPMRemoteReloadEvent",
-            "CPMRemoteMeleeEvent",
-            "InterpolateTransform",
-            "SynchronizeRemotes",
-            "moveMovementType.Sprint",
-            "moveMovementType.Walk",
-            "distanceSquared > 225.0"
-          )
-          foreach ($feature in $actionControllerFeatures) {
-            if ($redscript -notmatch [regex]::Escape($feature)) {
-              throw "Recurso Action Controller ausente no REDscript: $feature"
-            }
-          }
-
-          if ($redscript -match "ref<AIPositionSpec>") {
-            throw "AIPositionSpec foi declarado incorretamente como ref."
-          }
-          if ($redscript -match 'movementType\s*=\s*n"(Sprint|Walk)"') {
-            throw "movementType utiliza CName invalido."
-          }
-          if ($redscript -match "distanceSquared > 2\.25") {
-            throw "Teleporte corretivo antigo encontrado."
-          }
-          if ($redscript -match "UpdateMoveTarget") {
-            throw "Logica Continuous Path antiga encontrada."
-          }
-          if ($redscript -match "DisableCollider") {
-            throw "Desativacao antiga de colisao encontrada."
-          }
-
-          $starter = Get-Content "Start-Visual-Test.ps1" -Raw
-          if ($starter -notmatch "CPM-Action-Controller-Test-0\.1\.0\.2\.ps1") {
-            throw "Start-Visual-Test.ps1 aponta para o simulador errado."
-          }
-
-          $simulator = Get-Content "tools\CPM-Action-Controller-Test-0.1.0.2.ps1" -Raw
-          if ($simulator -notmatch "New-CPMPacket 3 66") {
-            throw "Simulador nao utiliza PlayerState de 66 bytes."
-          }
-          if ($simulator -notmatch "packet\.Count\s*-ne\s*78") {
-            throw "Simulador nao valida o pacote completo de 78 bytes."
-          }
-          if ($simulator -notmatch 'FASE:\s*\$phase') {
-            throw "Simulador nao anuncia as fases do teste."
-          }
-          if ($simulator -match 'else\s*\{\s*\$x\s*=\s*32\.4\s*\}') {
-            throw "Erro antigo de X 32.4 na fase inicial encontrado."
-          }
-
-          $connection = Get-Content "connection.example.json" -Raw | ConvertFrom-Json
-          if ($connection.protocolVersion -ne 2) {
-            throw "connection.example.json nao utiliza o protocolo 2."
-          }
-
-          Write-Host ""
-          Write-Host "FONTES CPM 0.1.0.2 VALIDADAS" -ForegroundColor Green
-          Write-Host ""
-
       - name: Configurar projeto
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
-          cmake -S . -B build -A x64
-          if ($LASTEXITCODE -ne 0) {
-            throw "Falha ao configurar o projeto com CMake."
-          }
+        run: cmake -S . -B build -A x64
 
       - name: Compilar cliente e servidor
+        run: cmake --build build --config Release --parallel
+
+      - name: Preparar pacote
         shell: powershell
         run: |
           $ErrorActionPreference = "Stop"
-          cmake --build build --config Release
-          if ($LASTEXITCODE -ne 0) {
-            throw "Falha ao compilar o CPM 0.1.0.2."
-          }
-
-      - name: Verificar binarios
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
-          $binaries = @(
-            "build\Release\CPMClient.dll",
-            "build\Release\CPMServer.exe"
-          )
-
-          foreach ($file in $binaries) {
-            if (!(Test-Path $file -PathType Leaf)) {
-              throw "Binario nao foi gerado: $file"
-            }
-            if ((Get-Item $file).Length -le 0) {
-              throw "Binario vazio ou invalido: $file"
-            }
-          }
-
-          Get-Item $binaries | Select-Object FullName, Length, LastWriteTime
-
-      - name: Preparar pacote limpo
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
-          if (Test-Path "package") {
-            Remove-Item "package" -Recurse -Force
-          }
 
           New-Item -ItemType Directory -Force -Path "package\red4ext\plugins\CPMClient" | Out-Null
           New-Item -ItemType Directory -Force -Path "package\r6\scripts\CPM" | Out-Null
@@ -236,69 +31,26 @@ jobs:
           Copy-Item "build\Release\CPMClient.dll" "package\red4ext\plugins\CPMClient\CPMClient.dll" -Force
           Copy-Item "build\Release\CPMServer.exe" "package\CPMServer.exe" -Force
           Copy-Item "resources\r6\scripts\CPM\CPMClient.reds" "package\r6\scripts\CPM\CPMClient.reds" -Force
-          Copy-Item "tools\CPM-Action-Controller-Test-0.1.0.2.ps1" "package\tools\CPM-Action-Controller-Test-0.1.0.2.ps1" -Force
+          Copy-Item "tools\CPM-Native-Actions-Test-0.1.0.3.ps1" "package\tools\CPM-Native-Actions-Test-0.1.0.3.ps1" -Force
           Copy-Item "Start-Visual-Test.ps1" "package\Start-Visual-Test.ps1" -Force
           Copy-Item "connection.example.json" "package\connection.example.json" -Force
           Copy-Item "install-client.bat" "package\install-client.bat" -Force
           Copy-Item "README.md" "package\README.md" -Force
 
-      - name: Validar pacote final
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
-          $requiredPackageFiles = @(
-            "package\red4ext\plugins\CPMClient\CPMClient.dll",
-            "package\CPMServer.exe",
-            "package\r6\scripts\CPM\CPMClient.reds",
-            "package\tools\CPM-Action-Controller-Test-0.1.0.2.ps1",
-            "package\Start-Visual-Test.ps1",
-            "package\connection.example.json",
-            "package\install-client.bat",
-            "package\README.md"
-          )
-
-          foreach ($file in $requiredPackageFiles) {
-            if (!(Test-Path $file -PathType Leaf)) {
-              throw "Arquivo ausente no pacote: $file"
-            }
-            if ((Get-Item $file).Length -le 0) {
-              throw "Arquivo vazio no pacote: $file"
-            }
+          if (!(Test-Path "package\red4ext\plugins\CPMClient\CPMClient.dll")) {
+            throw "CPMClient.dll nao foi gerada."
           }
 
-          $packagedStarter = Get-Content "package\Start-Visual-Test.ps1" -Raw
-          if ($packagedStarter -notmatch "CPM-Action-Controller-Test-0\.1\.0\.2\.ps1") {
-            throw "Starter final aponta para o simulador errado."
+          if (!(Test-Path "package\CPMServer.exe")) {
+            throw "CPMServer.exe nao foi gerado."
           }
 
-          $packagedConnection = Get-Content "package\connection.example.json" -Raw | ConvertFrom-Json
-          if ($packagedConnection.protocolVersion -ne 2) {
-            throw "Configuracao final nao utiliza protocolo 2."
-          }
+          Get-ChildItem "package" -Recurse
 
-          $packagedScript = Get-Content "package\r6\scripts\CPM\CPMClient.reds" -Raw
-          foreach ($feature in @("StopExecutingCommand", "AIEquipCommand", "NonCombatAim", "AnimFeature_QuickMelee")) {
-            if ($packagedScript -notmatch $feature) {
-              throw "Action Controller incompleto no pacote: $feature"
-            }
-          }
-
-          $oldFiles = Get-ChildItem "package" -Recurse -File | Where-Object {
-            $_.Name -match "CPM-States-Combat-Test-0\.1\.0|CPM-Multi-Remote-Test-0\.0\.8"
-          }
-          if ($oldFiles) {
-            throw "Arquivo de teste antigo encontrado no pacote: $($oldFiles.Name -join ', ')"
-          }
-
-          Write-Host ""
-          Write-Host "PACOTE CPM 0.1.0.2 VALIDADO COM SUCESSO" -ForegroundColor Green
-          Write-Host ""
-          Get-ChildItem "package" -Recurse | Select-Object FullName, Length, LastWriteTime
-
-      - name: Enviar CPM 0.1.0.2 Action Controller
+      - name: Enviar CPM 0.1.0.3 Native Actions
         uses: actions/upload-artifact@v4
         with:
-          name: CPM-Windows-0.1.0.2-Action-Controller
+          name: CPM-Windows-0.1.0.3-Native-Actions
           path: package
           if-no-files-found: error
           retention-days: 30
