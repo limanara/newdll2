@@ -46,8 +46,13 @@ public class CPMRemoteVisual extends IScriptable {
     private let lastReloadEvent: Int32;
     private let lastMeleeEvent: Int32;
     private let activeMoveCommand: ref<AIMoveToCommand>;
+    private let activeAimCommand: ref<AIAimAtTargetCommand>;
+    private let activeShootCommand: ref<AIShootCommand>;
+    private let activeMeleeCommand: ref<AIMeleeAttackCommand>;
     private let weaponRequested: Bool;
     private let meleeResetTicks: Int32;
+    private let reloadTicks: Int32;
+    private let airborne: Bool;
 
     public func Initialize(player: ref<PlayerPuppet>, playerID: Int32, slot: Int32) -> Void {
         this.player = player;
@@ -75,6 +80,8 @@ public class CPMRemoteVisual extends IScriptable {
         this.lastMeleeEvent = CPMRemoteMeleeEvent(playerID);
         this.weaponRequested = false;
         this.meleeResetTicks = 0;
+        this.reloadTicks = 0;
+        this.airborne = false;
         this.Spawn();
     }
 
@@ -122,15 +129,7 @@ public class CPMRemoteVisual extends IScriptable {
             AnimationControllerComponent.ApplyFeature(remote, n"Stance", stance);
             this.lastCrouched = crouched;
         };
-        if detailed != this.lastDetailedLocomotion {
-            if detailed == 18 || detailed == 19 || detailed == 20 || detailed == 21 {
-                AnimationControllerComponent.PushEvent(remote, n"Jump");
-            };
-            if detailed >= 23 && detailed <= 27 {
-                AnimationControllerComponent.PushEvent(remote, n"Land");
-            };
-            this.lastDetailedLocomotion = detailed;
-        };
+        this.UpdateAirState(remote, detailed);
         let aiming: Bool = CPMRemoteAiming(this.playerID);
         if aiming {
             let aim: ref<AnimFeature_Aim> = new AnimFeature_Aim();
@@ -142,6 +141,13 @@ public class CPMRemoteVisual extends IScriptable {
             );
             aim.Aim(aimPoint);
             AnimationControllerComponent.ApplyFeature(remote, n"NonCombatAim", aim);
+        };
+        if aiming && !this.lastAiming {
+            this.StartAim(remote);
+        } else {
+            if !aiming && this.lastAiming {
+                this.StopAim(remote);
+            };
         };
         this.lastAiming = aiming;
         if CPMRemoteWeaponEquipped(this.playerID) && !this.weaponRequested {
@@ -156,24 +162,27 @@ public class CPMRemoteVisual extends IScriptable {
         let weapon: ref<WeaponObject> = GameObject.GetActiveWeapon(remote);
         let shotEvent: Int32 = CPMRemoteShotEvent(this.playerID);
         if shotEvent != this.lastShotEvent {
-            AnimationControllerComponent.PushEvent(remote, n"Shoot");
-            if IsDefined(weapon) { AnimationControllerComponent.PushEvent(weapon, n"Shoot"); };
+            this.ExecuteShot(remote);
             this.lastShotEvent = shotEvent;
         };
         let reloadEvent: Int32 = CPMRemoteReloadEvent(this.playerID);
         if reloadEvent != this.lastReloadEvent {
-            AnimationControllerComponent.PushEvent(remote, n"Reload");
-            if IsDefined(weapon) { AnimationControllerComponent.PushEvent(weapon, n"Reload"); };
+            this.ExecuteReload(remote, weapon);
             this.lastReloadEvent = reloadEvent;
         };
         let meleeEvent: Int32 = CPMRemoteMeleeEvent(this.playerID);
         if meleeEvent != this.lastMeleeEvent {
-            let quickMelee: ref<AnimFeature_QuickMelee> = new AnimFeature_QuickMelee();
-            quickMelee.state = 1;
-            AnimationControllerComponent.ApplyFeature(remote, n"QuickMelee", quickMelee);
-            AnimationControllerComponent.PushEvent(remote, n"MeleeAttack");
-            this.meleeResetTicks = 8;
+            this.ExecuteMelee(remote);
             this.lastMeleeEvent = meleeEvent;
+        };
+        if this.reloadTicks > 0 {
+            this.reloadTicks -= 1;
+            if this.reloadTicks == 0 && IsDefined(weapon) {
+                weapon.StopReload(gameweaponReloadStatus.Standard);
+                WeaponObject.TriggerWeaponEffects(weapon, gamedataFxAction.ExitReload);
+                AnimationControllerComponent.PushEventToReplicate(weapon, n"ReloadEnd");
+                AnimationControllerComponent.PushEventToReplicate(remote, n"ReloadEnd");
+            };
         };
         if this.meleeResetTicks > 0 {
             this.meleeResetTicks -= 1;
@@ -183,6 +192,99 @@ public class CPMRemoteVisual extends IScriptable {
                 AnimationControllerComponent.ApplyFeature(remote, n"QuickMelee", resetMelee);
             };
         };
+    }
+
+    private func UpdateAirState(remote: ref<NPCPuppet>, detailed: Int32) -> Void {
+        if detailed == this.lastDetailedLocomotion { return; };
+        let jumping: Bool = detailed == 18 || detailed == 19 || detailed == 20 || detailed == 21;
+        let falling: Bool = detailed == 14;
+        let landing: Bool = detailed >= 23 && detailed <= 27;
+        if jumping || falling {
+            let air: ref<AnimFeature_PlayerLocomotionStateMachine> = new AnimFeature_PlayerLocomotionStateMachine();
+            air.inAirState = true;
+            AnimationControllerComponent.ApplyFeature(remote, n"LocomotionStateMachine", air);
+            if jumping {
+                AnimationControllerComponent.PushEventToReplicate(remote, n"Jump");
+            } else {
+                AnimationControllerComponent.PushEventToReplicate(remote, n"InAir");
+            };
+            this.airborne = true;
+        };
+        if landing {
+            let landingFeature: ref<AnimFeature_Landing> = new AnimFeature_Landing();
+            landingFeature.type = 1;
+            landingFeature.impactSpeed = -6.0;
+            AnimationControllerComponent.ApplyFeature(remote, n"Landing", landingFeature);
+            AnimationControllerComponent.PushEventToReplicate(remote, n"Land");
+            let ground: ref<AnimFeature_PlayerLocomotionStateMachine> = new AnimFeature_PlayerLocomotionStateMachine();
+            ground.inAirState = false;
+            AnimationControllerComponent.ApplyFeature(remote, n"LocomotionStateMachine", ground);
+            this.airborne = false;
+        };
+        this.lastDetailedLocomotion = detailed;
+    }
+
+    private func PlayerReference() -> EntityReference {
+        return CreateEntityReference("#player", nullArrayOfNames);
+    }
+
+    private func StartAim(remote: ref<NPCPuppet>) -> Void {
+        this.StopAim(remote);
+        let command: ref<AIAimAtTargetCommand> = new AIAimAtTargetCommand();
+        command.targetOverridePuppetRef = this.PlayerReference();
+        command.duration = -1.0;
+        if remote.GetAIControllerComponent().SendCommand(command) {
+            this.activeAimCommand = command;
+        };
+    }
+
+    private func StopAim(remote: ref<NPCPuppet>) -> Void {
+        if IsDefined(this.activeAimCommand) {
+            remote.GetAIControllerComponent().StopExecutingCommand(this.activeAimCommand, true);
+            this.activeAimCommand = null;
+        };
+    }
+
+    private func ExecuteShot(remote: ref<NPCPuppet>) -> Void {
+        if IsDefined(this.activeShootCommand) {
+            remote.GetAIControllerComponent().StopExecutingCommand(this.activeShootCommand, true);
+            this.activeShootCommand = null;
+        };
+        let command: ref<AIShootCommand> = new AIShootCommand();
+        command.targetOverridePuppetRef = this.PlayerReference();
+        command.duration = 0.35;
+        command.once = true;
+        if remote.GetAIControllerComponent().SendCommand(command) {
+            this.activeShootCommand = command;
+        };
+    }
+
+    private func ExecuteReload(remote: ref<NPCPuppet>, weapon: ref<WeaponObject>) -> Void {
+        if !IsDefined(weapon) { return; };
+        weapon.StartReload(2.0);
+        WeaponObject.TriggerWeaponEffects(weapon, gamedataFxAction.EnterReload);
+        AnimationControllerComponent.PushEventToReplicate(weapon, n"Reload");
+        AnimationControllerComponent.PushEventToReplicate(remote, n"Reload");
+        this.reloadTicks = 40;
+    }
+
+    private func ExecuteMelee(remote: ref<NPCPuppet>) -> Void {
+        this.StopAim(remote);
+        if IsDefined(this.activeMeleeCommand) {
+            remote.GetAIControllerComponent().StopExecutingCommand(this.activeMeleeCommand, true);
+            this.activeMeleeCommand = null;
+        };
+        let command: ref<AIMeleeAttackCommand> = new AIMeleeAttackCommand();
+        command.targetOverridePuppetRef = this.PlayerReference();
+        command.duration = 1.50;
+        if remote.GetAIControllerComponent().SendCommand(command) {
+            this.activeMeleeCommand = command;
+        };
+        let quickMelee: ref<AnimFeature_QuickMelee> = new AnimFeature_QuickMelee();
+        quickMelee.state = 1;
+        AnimationControllerComponent.ApplyFeature(remote, n"QuickMelee", quickMelee);
+        AnimationControllerComponent.PushEventToReplicate(remote, n"MeleeAttack");
+        this.meleeResetTicks = 20;
     }
 
     private func Spawn() -> Void {

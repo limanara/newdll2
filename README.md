@@ -1,7 +1,8 @@
-# CPM 0.1.0.2 — Action Controller
+# CPM 0.1.0.3 — Native Actions
 
-Hotfix funcional baseado na análise do vídeo da 0.1.0. Preserva a interpolação
-aprovada na 0.0.8 e adiciona prioridade entre locomoção e ações especiais.
+Atualização baseada no vídeo e nos logs da 0.1.0.2. Preserva a interpolação
+e a locomoção aprovadas e substitui eventos visuais genéricos por comandos de
+IA e chamadas reais da arma.
 
 ## O que esta versão testa
 
@@ -11,9 +12,13 @@ aprovada na 0.0.8 e adiciona prioridade entre locomoção e ações especiais.
 - eventos numerados de tiro, recarga e ataque corpo a corpo
 - cancelamento do AIMoveToCommand antes de salto e combate
 - caminhada agachada usando stealth locomotion
-- tentativa de equipar uma Omaha real no slot WeaponRight
-- mira pela entrada NonCombatAim e eventos aplicados também na arma
-- QuickMelee com ativação e reset controlados
+- pistola Omaha real equipada no slot WeaponRight
+- mira com AIAimAtTargetCommand apontada para o jogador local
+- tiros únicos com AIShootCommand
+- recarga com WeaponObject.StartReload e eventos replicados
+- ataque com AIMeleeAttackCommand e fallback QuickMelee
+- estados aéreos com LocomotionStateMachine, Landing e eventos replicados
+- retorno automático para perto do jogador antes do teste de combate
 - log nativo de todas as mudanças e contadores de ação
 - leitura dos estados reais pelo PlayerStateMachine Blackboard
 - API nativa de consulta dos jogadores remotos
@@ -31,8 +36,8 @@ aprovada na 0.0.8 e adiciona prioridade entre locomoção e ações especiais.
 - toda a rede, sessões, heartbeat e reconexão do CPM 0.0.4
 
 O teste incluído conecta um jogador simulado e percorre todas as fases em uma
-execução. A arma física, projéteis, dano e inventário ainda não são replicados;
-esta versão valida transporte e animação visual dos estados.
+execução. Os comandos de combate usam o jogador local como alvo; utilize um
+save de teste e um local seguro.
 
 ## Requisitos
 
@@ -48,10 +53,10 @@ existe e o jogo não carregará o script.
 
 ## Compilação no GitHub
 
-Execute o workflow **Build CPM 0.1.0.2 Action Controller** e baixe:
+Execute o workflow **Build CPM 0.1.0.3 Native Actions** e baixe:
 
 ```text
-CPM-Windows-0.1.0.2-Action-Controller
+CPM-Windows-0.1.0.3-Native-Actions
 ```
 
 ## Instalação
@@ -81,7 +86,7 @@ powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
 5. Volte ao PowerShell e pressione ENTER. O inicializador executará:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Action-Controller-Test-0.1.0.2.ps1"
+powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Native-Actions-Test-0.1.0.3.ps1"
 ```
 
 O NPC deverá ficar parado, caminhar, correr, agachar, saltar, mirar, disparar,
