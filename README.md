@@ -1,7 +1,7 @@
-# CPM 0.1.0 — Estados básicos e combate visual
+# CPM 0.1.0.2 — Action Controller
 
-Base experimental que preserva integralmente a interpolação aprovada na 0.0.8
-e adiciona protocolo explícito para estados do personagem e ações de combate.
+Hotfix funcional baseado na análise do vídeo da 0.1.0. Preserva a interpolação
+aprovada na 0.0.8 e adiciona prioridade entre locomoção e ações especiais.
 
 ## O que esta versão testa
 
@@ -9,6 +9,12 @@ e adiciona protocolo explícito para estados do personagem e ações de combate.
 - parado, caminhada, corrida, agachamento, salto, queda e aterrissagem
 - arma equipada, categoria da arma, mira e direção da mira
 - eventos numerados de tiro, recarga e ataque corpo a corpo
+- cancelamento do AIMoveToCommand antes de salto e combate
+- caminhada agachada usando stealth locomotion
+- tentativa de equipar uma Omaha real no slot WeaponRight
+- mira pela entrada NonCombatAim e eventos aplicados também na arma
+- QuickMelee com ativação e reset controlados
+- log nativo de todas as mudanças e contadores de ação
 - leitura dos estados reais pelo PlayerStateMachine Blackboard
 - API nativa de consulta dos jogadores remotos
 - criação segura de uma entidade dinâmica pelo Codeware
@@ -42,10 +48,10 @@ existe e o jogo não carregará o script.
 
 ## Compilação no GitHub
 
-Execute o workflow **Build CPM 0.1.0 States Combat** e baixe:
+Execute o workflow **Build CPM 0.1.0.2 Action Controller** e baixe:
 
 ```text
-CPM-Windows-0.1.0-States-Combat
+CPM-Windows-0.1.0.2-Action-Controller
 ```
 
 ## Instalação
@@ -75,7 +81,7 @@ powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
 5. Volte ao PowerShell e pressione ENTER. O inicializador executará:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\tools\CPM-States-Combat-Test-0.1.0.ps1"
+powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Action-Controller-Test-0.1.0.2.ps1"
 ```
 
 O NPC deverá ficar parado, caminhar, correr, agachar, saltar, mirar, disparar,

@@ -45,6 +45,9 @@ public class CPMRemoteVisual extends IScriptable {
     private let lastShotEvent: Int32;
     private let lastReloadEvent: Int32;
     private let lastMeleeEvent: Int32;
+    private let activeMoveCommand: ref<AIMoveToCommand>;
+    private let weaponRequested: Bool;
+    private let meleeResetTicks: Int32;
 
     public func Initialize(player: ref<PlayerPuppet>, playerID: Int32, slot: Int32) -> Void {
         this.player = player;
@@ -70,6 +73,8 @@ public class CPMRemoteVisual extends IScriptable {
         this.lastShotEvent = CPMRemoteShotEvent(playerID);
         this.lastReloadEvent = CPMRemoteReloadEvent(playerID);
         this.lastMeleeEvent = CPMRemoteMeleeEvent(playerID);
+        this.weaponRequested = false;
+        this.meleeResetTicks = 0;
         this.Spawn();
     }
 
@@ -103,14 +108,14 @@ public class CPMRemoteVisual extends IScriptable {
             1.0
         );
         this.UpdateLocomotion(remotePuppet, target);
-        this.UpdateNetworkStates(remoteObject);
+        this.UpdateNetworkStates(remotePuppet);
         this.InterpolateTransform(remoteObject, target);
     }
 
-    private func UpdateNetworkStates(remote: ref<GameObject>) -> Void {
+    private func UpdateNetworkStates(remote: ref<NPCPuppet>) -> Void {
         let detailed: Int32 = CPMRemoteDetailedLocomotion(this.playerID);
         let crouched: Bool = CPMRemoteLocomotion(this.playerID) == 1 || detailed == 3 || detailed == 30;
-        if crouched != this.lastCrouched {
+        if (crouched && !this.lastCrouched) || (!crouched && this.lastCrouched) {
             let stance: ref<AnimFeature_Stance> = new AnimFeature_Stance();
             if crouched { stance.SetStanceState(animStanceState.Crouch); }
             else { stance.SetStanceState(animStanceState.Stand); };
@@ -136,15 +141,48 @@ public class CPMRemoteVisual extends IScriptable {
                 1.0
             );
             aim.Aim(aimPoint);
-            AnimationControllerComponent.ApplyFeature(remote, n"Aim", aim);
+            AnimationControllerComponent.ApplyFeature(remote, n"NonCombatAim", aim);
         };
         this.lastAiming = aiming;
+        if CPMRemoteWeaponEquipped(this.playerID) && !this.weaponRequested {
+            let equip: ref<AIEquipCommand> = new AIEquipCommand();
+            equip.slotId = t"AttachmentSlots.WeaponRight";
+            equip.itemId = t"Items.Preset_Omaha_Default";
+            equip.failIfItemNotFound = false;
+            equip.durationOverride = 0.50;
+            remote.GetAIControllerComponent().SendCommand(equip);
+            this.weaponRequested = true;
+        };
+        let weapon: ref<WeaponObject> = GameObject.GetActiveWeapon(remote);
         let shotEvent: Int32 = CPMRemoteShotEvent(this.playerID);
-        if shotEvent != this.lastShotEvent { AnimationControllerComponent.PushEvent(remote, n"Shoot"); this.lastShotEvent = shotEvent; };
+        if shotEvent != this.lastShotEvent {
+            AnimationControllerComponent.PushEvent(remote, n"Shoot");
+            if IsDefined(weapon) { AnimationControllerComponent.PushEvent(weapon, n"Shoot"); };
+            this.lastShotEvent = shotEvent;
+        };
         let reloadEvent: Int32 = CPMRemoteReloadEvent(this.playerID);
-        if reloadEvent != this.lastReloadEvent { AnimationControllerComponent.PushEvent(remote, n"Reload"); this.lastReloadEvent = reloadEvent; };
+        if reloadEvent != this.lastReloadEvent {
+            AnimationControllerComponent.PushEvent(remote, n"Reload");
+            if IsDefined(weapon) { AnimationControllerComponent.PushEvent(weapon, n"Reload"); };
+            this.lastReloadEvent = reloadEvent;
+        };
         let meleeEvent: Int32 = CPMRemoteMeleeEvent(this.playerID);
-        if meleeEvent != this.lastMeleeEvent { AnimationControllerComponent.PushEvent(remote, n"MeleeAttack"); this.lastMeleeEvent = meleeEvent; };
+        if meleeEvent != this.lastMeleeEvent {
+            let quickMelee: ref<AnimFeature_QuickMelee> = new AnimFeature_QuickMelee();
+            quickMelee.state = 1;
+            AnimationControllerComponent.ApplyFeature(remote, n"QuickMelee", quickMelee);
+            AnimationControllerComponent.PushEvent(remote, n"MeleeAttack");
+            this.meleeResetTicks = 8;
+            this.lastMeleeEvent = meleeEvent;
+        };
+        if this.meleeResetTicks > 0 {
+            this.meleeResetTicks -= 1;
+            if this.meleeResetTicks == 0 {
+                let resetMelee: ref<AnimFeature_QuickMelee> = new AnimFeature_QuickMelee();
+                resetMelee.state = 0;
+                AnimationControllerComponent.ApplyFeature(remote, n"QuickMelee", resetMelee);
+            };
+        };
     }
 
     private func Spawn() -> Void {
@@ -154,7 +192,11 @@ public class CPMRemoteVisual extends IScriptable {
         spec.recordID = t"Character.spr_animals_bouncer1_ranged1_omaha_mb";
         spec.appearanceName = n"random";
         spec.position = this.localAnchor;
-        spec.orientation = EulerAngles.ToQuat(EulerAngles(0.0, 0.0, this.visualYaw));
+        let spawnAngles: EulerAngles;
+        spawnAngles.Pitch = 0.0;
+        spawnAngles.Roll = 0.0;
+        spawnAngles.Yaw = this.visualYaw;
+        spec.orientation = EulerAngles.ToQuat(spawnAngles);
         spec.persistState = false;
         spec.persistSpawn = false;
         spec.alwaysSpawned = true;
@@ -169,8 +211,19 @@ public class CPMRemoteVisual extends IScriptable {
         let requestedState: Int32 = 0;
         let networkLocomotion: Int32 = CPMRemoteLocomotion(this.playerID);
         let detailed: Int32 = CPMRemoteDetailedLocomotion(this.playerID);
-        if networkLocomotion == 2 || networkLocomotion == 11 || detailed == 4 || detailed == 30 { requestedState = 2; }
-        else { if CPMRemoteVelocity(this.playerID) > 0.20 { requestedState = 1; }; };
+        let specialAction: Bool = detailed == 14 || detailed >= 18 && detailed <= 27 || CPMRemoteAiming(this.playerID) ||
+            CPMRemoteWeaponState(this.playerID) == 2 || CPMRemoteWeaponState(this.playerID) == 8 ||
+            CPMRemoteMeleeEvent(this.playerID) != this.lastMeleeEvent;
+        if specialAction {
+            this.StopLocomotion(remote);
+            this.locomotionState = 0;
+            this.locomotionCandidate = 0;
+            this.locomotionCandidateTicks = 0;
+            return;
+        };
+        if networkLocomotion == 1 || detailed == 3 || detailed == 30 { requestedState = 3; }
+        else { if networkLocomotion == 2 || networkLocomotion == 11 || detailed == 4 { requestedState = 2; }
+        else { if CPMRemoteVelocity(this.playerID) > 0.20 { requestedState = 1; }; }; };
         if requestedState != this.locomotionCandidate {
             this.locomotionCandidate = requestedState;
             this.locomotionCandidateTicks = 1;
@@ -179,13 +232,21 @@ public class CPMRemoteVisual extends IScriptable {
             if this.locomotionState != this.locomotionCandidate {
                 this.locomotionState = this.locomotionCandidate;
                 if this.locomotionState > 0 {
-                    this.StartLocomotionAnimation(remote, target, this.locomotionState == 2);
-                };
+                    this.StartLocomotionAnimation(remote, target, this.locomotionState == 2, this.locomotionState == 3);
+                } else { this.StopLocomotion(remote); };
             };
         };
     }
 
-    private func StartLocomotionAnimation(remote: ref<NPCPuppet>, target: Vector4, running: Bool) -> Void {
+    private func StopLocomotion(remote: ref<NPCPuppet>) -> Void {
+        if IsDefined(this.activeMoveCommand) {
+            remote.GetAIControllerComponent().StopExecutingCommand(this.activeMoveCommand, true);
+            this.activeMoveCommand = null;
+        };
+    }
+
+    private func StartLocomotionAnimation(remote: ref<NPCPuppet>, target: Vector4, running: Bool, crouched: Bool) -> Void {
+        this.StopLocomotion(remote);
         let dx: Float = target.X - this.visualPosition.X;
         let dy: Float = target.Y - this.visualPosition.Y;
         let animationTarget: Vector4 = Vector4(target.X + dx * 40.0, target.Y + dy * 40.0, target.Z, 1.0);
@@ -199,10 +260,11 @@ public class CPMRemoteVisual extends IScriptable {
         command.ignoreNavigation = true;
         command.desiredDistanceFromTarget = 0.05;
         command.finishWhenDestinationReached = false;
-        command.alwaysUseStealth = false;
+        command.alwaysUseStealth = crouched;
         if running { command.movementType = moveMovementType.Sprint; }
         else { command.movementType = moveMovementType.Walk; };
         remote.GetAIControllerComponent().SendCommand(command);
+        this.activeMoveCommand = command;
     }
 
     private func InterpolateTransform(remote: ref<GameObject>, target: Vector4) -> Void {
@@ -222,8 +284,12 @@ public class CPMRemoteVisual extends IScriptable {
         if yawDelta > 180.0 { yawDelta -= 360.0; }
         else { if yawDelta < -180.0 { yawDelta += 360.0; }; };
         this.visualYaw += yawDelta * 0.18;
+        let visualAngles: EulerAngles;
+        visualAngles.Pitch = 0.0;
+        visualAngles.Roll = 0.0;
+        visualAngles.Yaw = this.visualYaw;
         GameInstance.GetTeleportationFacility(this.player.GetGame()).Teleport(
-            remote, this.visualPosition, EulerAngles(0.0, 0.0, this.visualYaw)
+            remote, this.visualPosition, visualAngles
         );
     }
 }

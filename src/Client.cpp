@@ -93,7 +93,19 @@ void Client::HandlePacket(const char* data,int bytes){
         const auto* pong=reinterpret_cast<const Protocol::Pong*>(data+sizeof(Protocol::Header));const auto now=NowMs();pingMs_=static_cast<std::uint32_t>(now>=pong->clientTimeMs?now-pong->clientTimeMs:0);
     }else if(header->type==Protocol::Type::PlayerState&&header->payloadSize==sizeof(Protocol::PlayerState)){
         const auto* state=reinterpret_cast<const Protocol::PlayerState*>(data+sizeof(Protocol::Header));if(state->playerId==playerId_.load())return;
-        std::scoped_lock lock(remotesMutex_);auto& remote=remotes_[state->playerId];if(remote.receivedPackets>0&&state->sequence>remote.lastSequence+1)remote.lostPackets+=state->sequence-remote.lastSequence-1;remote.state=*state;remote.lastSequence=state->sequence;remote.receivedPackets++;remote.lastSeen=Clock::now();
+        std::scoped_lock lock(remotesMutex_);auto& remote=remotes_[state->playerId];
+        if(remote.receivedPackets>0&&state->sequence>remote.lastSequence+1)remote.lostPackets+=state->sequence-remote.lastSequence-1;
+        const auto old=remote.state;
+        if(remote.receivedPackets>0){
+            if(old.locomotion!=state->locomotion||old.detailedLocomotion!=state->detailedLocomotion)
+                Logger::Get().Info(std::format("Remoto {} | Locomocao {} detalhe {}",state->playerId,state->locomotion,state->detailedLocomotion));
+            if(old.flags!=state->flags||old.upperBody!=state->upperBody||old.weaponState!=state->weaponState)
+                Logger::Get().Info(std::format("Remoto {} | Combate flags {} upper {} weapon {} tipo {}",state->playerId,state->flags,state->upperBody,state->weaponState,state->weaponType));
+            if(old.shotEvent!=state->shotEvent)Logger::Get().Info(std::format("Remoto {} | Evento tiro {}",state->playerId,state->shotEvent));
+            if(old.reloadEvent!=state->reloadEvent)Logger::Get().Info(std::format("Remoto {} | Evento recarga {}",state->playerId,state->reloadEvent));
+            if(old.meleeEvent!=state->meleeEvent)Logger::Get().Info(std::format("Remoto {} | Evento melee {}",state->playerId,state->meleeEvent));
+        }
+        remote.state=*state;remote.lastSequence=state->sequence;remote.receivedPackets++;remote.lastSeen=Clock::now();
         if((state->sequence%100)==0)Logger::Get().Info(std::format("Remoto {} | Seq {} | X {:.2f} Y {:.2f} Z {:.2f} | Rot {:.1f} | Vel {:.2f}",state->playerId,state->sequence,state->x,state->y,state->z,state->yaw,state->velocity));
     }else if(header->type==Protocol::Type::PlayerLeft&&header->payloadSize==sizeof(Protocol::PlayerLeft)){
         const auto* left=reinterpret_cast<const Protocol::PlayerLeft*>(data+sizeof(Protocol::Header));std::scoped_lock lock(remotesMutex_);remotes_.erase(left->playerId);Logger::Get().Info(std::format("Player remoto {} desconectou.",left->playerId));
@@ -105,7 +117,7 @@ void Client::Run(ConnectionConfig config){
     {std::scoped_lock lock(socketMutex_);socket_=socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);}if(socket_==INVALID_SOCKET){Logger::Get().Error("Não foi possível criar o socket UDP.");running_=false;return;}
     DWORD timeout=100;setsockopt(socket_,SOL_SOCKET,SO_RCVTIMEO,reinterpret_cast<const char*>(&timeout),sizeof(timeout));server_={};server_.sin_family=AF_INET;server_.sin_port=htons(config.port);
     if(inet_pton(AF_INET,config.address.c_str(),&server_.sin_addr)!=1){addrinfo hints{};hints.ai_family=AF_INET;hints.ai_socktype=SOCK_DGRAM;addrinfo* result{};if(getaddrinfo(config.address.c_str(),nullptr,&hints,&result)!=0||!result){Logger::Get().Error("Endereço do servidor inválido.");running_=false;return;}server_.sin_addr=reinterpret_cast<sockaddr_in*>(result->ai_addr)->sin_addr;freeaddrinfo(result);}
-    Logger::Get().Info(std::format("CPM 0.1.0 Estados e Combate conectando a {}:{}...",config.address,config.port));
+    Logger::Get().Info(std::format("CPM 0.1.0.2 Action Controller conectando a {}:{}...",config.address,config.port));
     auto lastHello=Clock::now()-std::chrono::seconds(5),lastHeartbeat=lastHello,lastStats=Clock::now();lastServerPacket_=Clock::now();char packet[512];
     while(running_){
         const auto now=Clock::now();
