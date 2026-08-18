@@ -28,7 +28,7 @@ int main(int argc,char** argv){
     sockaddr_in local{};local.sin_family=AF_INET;local.sin_addr.s_addr=INADDR_ANY;local.sin_port=htons(port);
     if(bind(handle,reinterpret_cast<sockaddr*>(&local),sizeof(local))==SOCKET_ERROR){std::cerr<<"Nao foi possivel abrir a porta "<<port<<".\n";closesocket(handle);WSACleanup();return 1;}
     std::unordered_map<std::uint64_t,Session> sessions;std::unordered_map<std::uint64_t,std::uint64_t> endpoints;std::uint32_t nextId=1;std::uint64_t totalPackets=0,totalRelayed=0,invalidPackets=0;auto lastStats=Clock::now();
-    std::cout<<"========================================\n CPM SERVER 0.1.0.3 NATIVE ACTIONS\n========================================\n";
+    std::cout<<"========================================\n CPM SERVER 0.1.0.4 AIR + MELEE CONTROLLER\n========================================\n";
     std::cout<<"Servidor UDP ativo na porta "<<port<<". CTRL+C encerra.\n\n";
     while(g_running){
         fd_set set;FD_ZERO(&set);FD_SET(handle,&set);timeval wait{0,100000};

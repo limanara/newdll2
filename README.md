@@ -1,6 +1,6 @@
-# CPM 0.1.0.3 — Native Actions Hotfix
+# CPM 0.1.0.4 — Air + Melee Controller
 
-Atualização baseada no vídeo e nos logs da 0.1.0.2. Preserva a interpolação
+Atualização baseada no teste e nos logs da 0.1.0.3. Preserva a interpolação
 e a locomoção aprovadas e substitui eventos visuais genéricos por comandos de
 IA e chamadas reais da arma.
 
@@ -17,7 +17,10 @@ IA e chamadas reais da arma.
 - tiros únicos com AIShootCommand
 - recarga com WeaponObject.StartReload e eventos replicados
 - ataque com AIMeleeAttackCommand e fallback QuickMelee
-- estados aéreos com LocomotionStateMachine, Landing e eventos replicados
+- altura aérea controlada de até 1,45 m além dos estados de animação
+- aterrissagem com retorno explícito da altura visual ao solo
+- fase dedicada para guardar a arma antes do corpo a corpo
+- cancelamento de movimento, mira, tiro e recarga antes do melee
 - retorno automático para perto do jogador antes do teste de combate
 - log nativo de todas as mudanças e contadores de ação
 - leitura dos estados reais pelo PlayerStateMachine Blackboard
@@ -53,10 +56,10 @@ existe e o jogo não carregará o script.
 
 ## Compilação no GitHub
 
-Execute o workflow **Build CPM 0.1.0.3 Native Actions Hotfix** e baixe:
+Execute o workflow **Build CPM 0.1.0.4 Air Melee Controller** e baixe:
 
 ```text
-CPM-Windows-0.1.0.3-Native-Actions-Hotfix
+CPM-Windows-0.1.0.4-Air-Melee-Controller
 ```
 
 ## Instalação
@@ -86,11 +89,11 @@ powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
 5. Volte ao PowerShell e pressione ENTER. O inicializador executará:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Native-Actions-Test-0.1.0.3.ps1"
+powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Air-Melee-Test-0.1.0.4.ps1"
 ```
 
 O NPC deverá ficar parado, caminhar, correr, agachar, saltar, mirar, disparar,
-recarregar e atacar. Ao final, será removido pelo timeout.
+recarregar, guardar a arma e atacar. Ao final, será removido pelo timeout.
 
 As coordenadas enviadas pelo simulador são tratadas como deslocamento relativo.
 No instante da conexão, o CPM captura a posição atual do jogador real e usa esse
