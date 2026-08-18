@@ -1,4 +1,4 @@
-# CPM 0.1.0.3 — Native Actions
+# CPM 0.1.0.3 — Native Actions Hotfix
 
 Atualização baseada no vídeo e nos logs da 0.1.0.2. Preserva a interpolação
 e a locomoção aprovadas e substitui eventos visuais genéricos por comandos de
@@ -53,10 +53,10 @@ existe e o jogo não carregará o script.
 
 ## Compilação no GitHub
 
-Execute o workflow **Build CPM 0.1.0.3 Native Actions** e baixe:
+Execute o workflow **Build CPM 0.1.0.3 Native Actions Hotfix** e baixe:
 
 ```text
-CPM-Windows-0.1.0.3-Native-Actions
+CPM-Windows-0.1.0.3-Native-Actions-Hotfix
 ```
 
 ## Instalação
