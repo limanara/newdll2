@@ -1,118 +1,65 @@
-# CPM 0.1.0.4 — Air + Melee Controller
+# CPM 0.1.0.5 — Native Air + Equip + Melee
 
-Atualização baseada no teste e nos logs da 0.1.0.3. Preserva a interpolação
-e a locomoção aprovadas e substitui eventos visuais genéricos por comandos de
-IA e chamadas reais da arma.
+Esta versão continua a 0.1.0.3/0.1.0.4 e foca somente nas fases que ainda falharam no teste visual.
 
-## O que esta versão testa
+## Alterações principais
 
-- protocolo v2 incompatível com servidores e simuladores antigos
-- parado, caminhada, corrida, agachamento, salto, queda e aterrissagem
-- arma equipada, categoria da arma, mira e direção da mira
-- eventos numerados de tiro, recarga e ataque corpo a corpo
-- cancelamento do AIMoveToCommand antes de salto e combate
-- caminhada agachada usando stealth locomotion
-- pistola Omaha real equipada no slot WeaponRight
-- mira com AIAimAtTargetCommand apontada para o jogador local
-- tiros únicos com AIShootCommand
-- recarga com WeaponObject.StartReload e eventos replicados
-- ataque com AIMeleeAttackCommand e fallback QuickMelee
-- altura aérea controlada de até 1,45 m além dos estados de animação
-- aterrissagem com retorno explícito da altura visual ao solo
-- fase dedicada para guardar a arma antes do corpo a corpo
-- cancelamento de movimento, mira, tiro e recarga antes do melee
-- retorno automático para perto do jogador antes do teste de combate
-- log nativo de todas as mudanças e contadores de ação
-- leitura dos estados reais pelo PlayerStateMachine Blackboard
-- API nativa de consulta dos jogadores remotos
-- criação segura de uma entidade dinâmica pelo Codeware
-- criação simultânea de vários jogadores remotos
-- controlador visual independente por jogador
-- recepção de posição e rotação a cada 50 ms
-- interpolação exponencial da transformação visual a cada 50 ms
-- comando auxiliar enviado somente na troca entre Walk e Sprint
-- nenhuma previsão agressiva na trajetória circular
-- histerese de 500 ms entre os estados Walk e Sprint
-- recuperação direta somente acima de 15 metros
-- posição independente da navegação e dos obstáculos da IA
-- remoção automática da entidade após a desconexão
-- toda a rede, sessões, heartbeat e reconexão do CPM 0.0.4
+- SALTO: mantém o controlador vertical visual e agora também aplica `AnimFeature_PlayerMovement` com velocidade vertical positiva e estado `inAirState=true`.
+- QUEDA: aplica velocidade vertical negativa e mantém o estado aéreo até o pouso.
+- ATERRISSAGEM: aplica `AnimFeature_Landing`, zera a velocidade vertical e força a postura em pé.
+- RETORNO EM PÉ: não executa mais corrida de retorno. O NPC apenas sai do agachamento e permanece parado/em pé.
+- EQUIPANDO ARMA: garante que a Omaha exista no inventário do NPC antes de enviar `AIEquipCommand`.
+- GUARDANDO ARMA: agora usa `AIUnequipCommand` real no slot `WeaponRight`.
+- MELEE: força postura em pé, cancela mira/tiro/recarga, solicita o unequip e aguarda 12 ticks (~600 ms) antes do `AIMeleeAttackCommand`.
+- O evento melee também reforça `QuickMelee`, `MeleeAttack` e `Attack`.
 
-O teste incluído conecta um jogador simulado e percorre todas as fases em uma
-execução. Os comandos de combate usam o jogador local como alvo; utilize um
-save de teste e um local seguro.
+## Build
 
-## Requisitos
-
-- Cyberpunk 2077 Steam 2.31
-- RED4ext compatível
-- redscript estável
-- Codeware compatível instalado
-- `%LOCALAPPDATA%\CPM\connection.json` apontando para `127.0.0.1:11777`
-
-O Codeware não está incluído neste pacote. Instale-o na raiz do jogo antes de
-instalar o CPM. Sem ele, o redscript informará que `DynamicEntitySystem` não
-existe e o jogo não carregará o script.
-
-## Compilação no GitHub
-
-Execute o workflow **Build CPM 0.1.0.4 Air Melee Controller** e baixe:
+No GitHub Actions execute o workflow:
 
 ```text
-CPM-Windows-0.1.0.4-Air-Melee-Controller
+Build CPM 0.1.0.5 Native Air + Equip + Melee Controller
+```
+
+Baixe o artifact:
+
+```text
+CPM-Windows-0.1.0.5-Native-Air-Equip-Melee
 ```
 
 ## Instalação
 
-Copie as pastas `red4ext` e `r6` do artefato para a raiz:
+Copie `red4ext` e `r6` do artifact para a raiz do Cyberpunk 2077 e aceite substituir os arquivos antigos.
 
-```text
-D:\SteamLibrary\steamapps\common\Cyberpunk 2077
-```
+## Teste
 
-Aceite substituir `CPMClient.dll` e `CPMClient.reds`.
-
-## Teste visual
-
-1. Feche o jogo e qualquer servidor CPM antigo.
-2. Execute na raiz do artefato:
+Na raiz do artifact:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
 ```
 
-3. Abra o Cyberpunk e carregue um save quando solicitado.
-   Use um save de teste: o modelo desta fase é apenas um marcador visual e
-   ainda conserva comportamentos nativos de NPC.
-4. Permaneça em qualquer local seguro do mapa. O NPC será criado
-   à frente do seu personagem.
-5. Volte ao PowerShell e pressione ENTER. O inicializador executará:
+O inicializador executa automaticamente:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Air-Melee-Test-0.1.0.4.ps1"
+powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Air-Melee-Test-0.1.0.5.ps1"
 ```
 
-O NPC deverá ficar parado, caminhar, correr, agachar, saltar, mirar, disparar,
-recarregar, guardar a arma e atacar. Ao final, será removido pelo timeout.
+Fases de interesse:
 
-As coordenadas enviadas pelo simulador são tratadas como deslocamento relativo.
-No instante da conexão, o CPM captura a posição atual do jogador real e usa esse
-ponto como âncora. Portanto, CET, teleporte e coordenadas fixas não são necessários.
+```text
+PARADO ANTES DO SALTO
+SALTO
+QUEDA
+ATERRISSAGEM
+RETORNO EM PE
+EQUIPANDO ARMA
+GUARDANDO ARMA
+ATAQUE CORPO A CORPO
+```
 
-## Diagnóstico
-
-Log do cliente:
+Depois do teste, envie as últimas linhas do log:
 
 ```powershell
-Get-Content "$env:LOCALAPPDATA\CPM\logs\CPMClient.log" -Wait -Tail 60
+Get-Content "$env:LOCALAPPDATA\CPM\logs\CPMClient.log" -Tail 60
 ```
-
-Log do redscript:
-
-```powershell
-Get-Content "D:\SteamLibrary\steamapps\common\Cyberpunk 2077\r6\logs\redscript_rCURRENT.log" -Tail 100
-```
-
-Se ocorrer erro de script, envie as últimas linhas de `redscript.log`. Se o
-jogo abrir mas o NPC não aparecer, envie também `CPMClient.log` e a saída do
-servidor.
