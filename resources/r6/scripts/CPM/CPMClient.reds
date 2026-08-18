@@ -53,6 +53,10 @@ public class CPMRemoteVisual extends IScriptable {
     private let meleeResetTicks: Int32;
     private let reloadTicks: Int32;
     private let airborne: Bool;
+    private let verticalOffset: Float;
+    private let groundZ: Float;
+    private let meleePending: Bool;
+    private let meleeGuardTicks: Int32;
 
     public func Initialize(player: ref<PlayerPuppet>, playerID: Int32, slot: Int32) -> Void {
         this.player = player;
@@ -82,6 +86,10 @@ public class CPMRemoteVisual extends IScriptable {
         this.meleeResetTicks = 0;
         this.reloadTicks = 0;
         this.airborne = false;
+        this.verticalOffset = 0.0;
+        this.groundZ = this.localAnchor.Z;
+        this.meleePending = false;
+        this.meleeGuardTicks = 0;
         this.Spawn();
     }
 
@@ -108,10 +116,12 @@ public class CPMRemoteVisual extends IScriptable {
         let remoteObject: ref<GameObject> = remote as GameObject;
         let remotePuppet: ref<NPCPuppet> = remote as NPCPuppet;
         if !IsDefined(remoteObject) || !IsDefined(remotePuppet) { return; };
+        let detailed: Int32 = CPMRemoteDetailedLocomotion(this.playerID);
+        let networkZ: Float = this.localAnchor.Z + CPMRemoteZ(this.playerID) - this.remoteOriginZ;
         let target: Vector4 = Vector4(
             this.localAnchor.X + CPMRemoteX(this.playerID) - this.remoteOriginX,
             this.localAnchor.Y + CPMRemoteY(this.playerID) - this.remoteOriginY,
-            this.localAnchor.Z + CPMRemoteZ(this.playerID) - this.remoteOriginZ,
+            this.ControlledVerticalZ(networkZ, detailed),
             1.0
         );
         this.UpdateLocomotion(remotePuppet, target);
@@ -150,7 +160,8 @@ public class CPMRemoteVisual extends IScriptable {
             };
         };
         this.lastAiming = aiming;
-        if CPMRemoteWeaponEquipped(this.playerID) && !this.weaponRequested {
+        let remoteWeaponEquipped: Bool = CPMRemoteWeaponEquipped(this.playerID);
+        if remoteWeaponEquipped && !this.weaponRequested {
             let equip: ref<AIEquipCommand> = new AIEquipCommand();
             equip.slotId = t"AttachmentSlots.WeaponRight";
             equip.itemId = t"Items.Preset_Omaha_Default";
@@ -158,6 +169,9 @@ public class CPMRemoteVisual extends IScriptable {
             equip.durationOverride = 0.50;
             remote.GetAIControllerComponent().SendCommand(equip);
             this.weaponRequested = true;
+        };
+        if !remoteWeaponEquipped {
+            this.weaponRequested = false;
         };
         let weapon: ref<WeaponObject> = GameObject.GetActiveWeapon(remote);
         let shotEvent: Int32 = CPMRemoteShotEvent(this.playerID);
@@ -172,8 +186,15 @@ public class CPMRemoteVisual extends IScriptable {
         };
         let meleeEvent: Int32 = CPMRemoteMeleeEvent(this.playerID);
         if meleeEvent != this.lastMeleeEvent {
-            this.ExecuteMelee(remote);
+            this.PrepareMelee(remote, weapon);
             this.lastMeleeEvent = meleeEvent;
+        };
+        if this.meleePending && this.meleeGuardTicks > 0 {
+            this.meleeGuardTicks -= 1;
+            if this.meleeGuardTicks == 0 {
+                this.meleePending = false;
+                this.ExecuteMelee(remote);
+            };
         };
         if this.reloadTicks > 0 {
             this.reloadTicks -= 1;
@@ -192,6 +213,41 @@ public class CPMRemoteVisual extends IScriptable {
                 AnimationControllerComponent.ApplyFeature(remote, n"QuickMelee", resetMelee);
             };
         };
+    }
+
+    private func ControlledVerticalZ(networkZ: Float, detailed: Int32) -> Float {
+        let jumping: Bool = detailed == 18 || detailed == 19 || detailed == 20 || detailed == 21;
+        let falling: Bool = detailed == 14;
+        let landing: Bool = detailed >= 23 && detailed <= 27;
+
+        if jumping {
+            if !this.airborne {
+                this.groundZ = this.visualPosition.Z;
+                this.verticalOffset = 0.0;
+            };
+            this.verticalOffset += 0.075;
+            if this.verticalOffset > 1.45 { this.verticalOffset = 1.45; };
+            return this.groundZ + this.verticalOffset;
+        };
+
+        if falling {
+            if !this.airborne {
+                this.groundZ = this.visualPosition.Z - this.verticalOffset;
+            };
+            this.verticalOffset -= 0.075;
+            if this.verticalOffset < 0.0 { this.verticalOffset = 0.0; };
+            return this.groundZ + this.verticalOffset;
+        };
+
+        if landing {
+            this.verticalOffset = 0.0;
+            this.groundZ = networkZ;
+            return this.groundZ;
+        };
+
+        this.verticalOffset = 0.0;
+        this.groundZ = networkZ;
+        return networkZ;
     }
 
     private func UpdateAirState(remote: ref<NPCPuppet>, detailed: Int32) -> Void {
@@ -269,6 +325,29 @@ public class CPMRemoteVisual extends IScriptable {
         this.reloadTicks = 40;
     }
 
+    private func PrepareMelee(remote: ref<NPCPuppet>, weapon: ref<WeaponObject>) -> Void {
+        this.StopAim(remote);
+        this.StopLocomotion(remote);
+        if IsDefined(this.activeShootCommand) {
+            remote.GetAIControllerComponent().StopExecutingCommand(this.activeShootCommand, true);
+            this.activeShootCommand = null;
+        };
+        if IsDefined(this.activeMeleeCommand) {
+            remote.GetAIControllerComponent().StopExecutingCommand(this.activeMeleeCommand, true);
+            this.activeMeleeCommand = null;
+        };
+        if this.reloadTicks > 0 && IsDefined(weapon) {
+            weapon.StopReload(gameweaponReloadStatus.Standard);
+            WeaponObject.TriggerWeaponEffects(weapon, gamedataFxAction.ExitReload);
+            AnimationControllerComponent.PushEventToReplicate(weapon, n"ReloadEnd");
+            AnimationControllerComponent.PushEventToReplicate(remote, n"ReloadEnd");
+            this.reloadTicks = 0;
+        };
+        this.lastAiming = false;
+        this.meleePending = true;
+        this.meleeGuardTicks = 8;
+    }
+
     private func ExecuteMelee(remote: ref<NPCPuppet>) -> Void {
         this.StopAim(remote);
         if IsDefined(this.activeMeleeCommand) {
@@ -284,8 +363,9 @@ public class CPMRemoteVisual extends IScriptable {
         let quickMelee: ref<AnimFeature_QuickMelee> = new AnimFeature_QuickMelee();
         quickMelee.state = 1;
         AnimationControllerComponent.ApplyFeature(remote, n"QuickMelee", quickMelee);
+        AnimationControllerComponent.PushEventToReplicate(remote, n"QuickMelee");
         AnimationControllerComponent.PushEventToReplicate(remote, n"MeleeAttack");
-        this.meleeResetTicks = 20;
+        this.meleeResetTicks = 24;
     }
 
     private func Spawn() -> Void {
