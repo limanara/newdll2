@@ -15,5 +15,5 @@ copy /Y "%DLL%" "%GAME%\red4ext\plugins\CPMClient\CPMClient.dll"
 copy /Y "%REDS%" "%GAME%\r6\scripts\CPM\CPMClient.reds"
 if not exist "%LOCALAPPDATA%\CPM" mkdir "%LOCALAPPDATA%\CPM"
 if exist "connection.example.json" copy /Y "connection.example.json" "%LOCALAPPDATA%\CPM\connection.json"
-echo CPM Client 0.1.0.2 Action Controller instalado.
+echo CPM Client 0.1.0.6 Real Z NPC Air Return Melee instalado.
 pause

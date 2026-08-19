@@ -1,65 +1,42 @@
-# CPM 0.1.0.5 — Native Air + Equip + Melee
+# CPM 0.1.0.6 — Real Z + NPC Air + Return + Melee
 
-Esta versão continua a 0.1.0.3/0.1.0.4 e foca somente nas fases que ainda falharam no teste visual.
+Versão de correção baseada no teste visual da 0.1.0.5.
 
-## Alterações principais
+## Correções principais
 
-- SALTO: mantém o controlador vertical visual e agora também aplica `AnimFeature_PlayerMovement` com velocidade vertical positiva e estado `inAirState=true`.
-- QUEDA: aplica velocidade vertical negativa e mantém o estado aéreo até o pouso.
-- ATERRISSAGEM: aplica `AnimFeature_Landing`, zera a velocidade vertical e força a postura em pé.
-- RETORNO EM PÉ: não executa mais corrida de retorno. O NPC apenas sai do agachamento e permanece parado/em pé.
-- EQUIPANDO ARMA: garante que a Omaha exista no inventário do NPC antes de enviar `AIEquipCommand`.
-- GUARDANDO ARMA: agora usa `AIUnequipCommand` real no slot `WeaponRight`.
-- MELEE: força postura em pé, cancela mira/tiro/recarga, solicita o unequip e aguarda 12 ticks (~600 ms) antes do `AIMeleeAttackCommand`.
-- O evento melee também reforça `QuickMelee`, `MeleeAttack` e `Attack`.
+- SALTO e QUEDA agora recebem uma trajetória Z real pela rede, em vez de manter Z=0 e depender somente de um offset local.
+- O visual aplica a altura de rede diretamente durante a fase aérea.
+- Foram removidos `AnimFeature_PlayerMovement` e `AnimFeature_PlayerLocomotionStateMachine`, que são específicos do player e podem ser ignorados por `NPCPuppet`.
+- O NPC recebe recursos/eventos genéricos de movimento, salto, queda e aterrissagem.
+- RETORNO agora envia corrida progressiva de X=29 até X=4; não existe mais teleporte proposital entre retorno e combate.
+- O melee interrompe a locomoção durante toda a preparação, repete o unequip se necessário e aguarda até 1 segundo pela arma.
+- O teste foi reorganizado para garantir que guardar arma, melee e estado final sejam enviados antes da desconexão.
+- Versões do cliente, servidor, instalador, workflow e artifact foram sincronizadas em 0.1.0.6.
 
-## Build
+## Artifact
 
-No GitHub Actions execute o workflow:
-
-```text
-Build CPM 0.1.0.5 Native Air + Equip + Melee Controller
-```
-
-Baixe o artifact:
+No GitHub Actions baixe:
 
 ```text
-CPM-Windows-0.1.0.5-Native-Air-Equip-Melee
+CPM-Windows-0.1.0.6-Real-Z-NPC-Air-Return-Melee
 ```
 
 ## Instalação
 
-Copie `red4ext` e `r6` do artifact para a raiz do Cyberpunk 2077 e aceite substituir os arquivos antigos.
+Copie as pastas `red4ext` e `r6` para a raiz do Cyberpunk 2077, aceitando substituir os arquivos anteriores.
 
 ## Teste
 
-Na raiz do artifact:
+Na pasta extraída do artifact:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
 ```
 
-O inicializador executa automaticamente:
+Depois do teste:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\tools\CPM-Air-Melee-Test-0.1.0.5.ps1"
+Get-Content "$env:LOCALAPPDATA\CPM\logs\CPMClient.log" -Tail 80
 ```
 
-Fases de interesse:
-
-```text
-PARADO ANTES DO SALTO
-SALTO
-QUEDA
-ATERRISSAGEM
-RETORNO EM PE
-EQUIPANDO ARMA
-GUARDANDO ARMA
-ATAQUE CORPO A CORPO
-```
-
-Depois do teste, envie as últimas linhas do log:
-
-```powershell
-Get-Content "$env:LOCALAPPDATA\CPM\logs\CPMClient.log" -Tail 60
-```
+O teste dentro do jogo continua obrigatório: o build valida C++ e empacotamento, mas o grafo de animação do NPC só pode ser confirmado em execução no Cyberpunk.

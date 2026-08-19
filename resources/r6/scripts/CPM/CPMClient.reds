@@ -54,8 +54,6 @@ public class CPMRemoteVisual extends IScriptable {
     private let meleeResetTicks: Int32;
     private let reloadTicks: Int32;
     private let airborne: Bool;
-    private let verticalOffset: Float;
-    private let groundZ: Float;
     private let meleePending: Bool;
     private let meleeGuardTicks: Int32;
 
@@ -88,8 +86,6 @@ public class CPMRemoteVisual extends IScriptable {
         this.meleeResetTicks = 0;
         this.reloadTicks = 0;
         this.airborne = false;
-        this.verticalOffset = 0.0;
-        this.groundZ = this.localAnchor.Z;
         this.meleePending = false;
         this.meleeGuardTicks = 0;
         this.Spawn();
@@ -123,7 +119,7 @@ public class CPMRemoteVisual extends IScriptable {
         let target: Vector4 = Vector4(
             this.localAnchor.X + CPMRemoteX(this.playerID) - this.remoteOriginX,
             this.localAnchor.Y + CPMRemoteY(this.playerID) - this.remoteOriginY,
-            this.ControlledVerticalZ(networkZ, detailed),
+            networkZ,
             1.0
         );
         this.UpdateLocomotion(remotePuppet, target);
@@ -164,7 +160,7 @@ public class CPMRemoteVisual extends IScriptable {
         this.lastAiming = aiming;
         let remoteWeaponEquipped: Bool = CPMRemoteWeaponEquipped(this.playerID);
         if remoteWeaponEquipped && !this.weaponRequested {
-            // 0.1.0.5: guarantee that the visual puppet really owns the test weapon
+            // 0.1.0.6: guarantee that the visual puppet really owns the test weapon
             // before asking the AI controller to draw it.
             let transactionSystem: ref<TransactionSystem> = GameInstance.GetTransactionSystem(remote.GetGame());
             let testWeaponID: ItemID = ItemID.FromTDBID(t"Items.Preset_Omaha_Default");
@@ -204,7 +200,15 @@ public class CPMRemoteVisual extends IScriptable {
             this.lastMeleeEvent = meleeEvent;
         };
         if this.meleePending && this.meleeGuardTicks > 0 {
-            this.meleeGuardTicks -= 1;
+            let activeMeleeWeapon: ref<WeaponObject> = GameObject.GetActiveWeapon(remote);
+            if !IsDefined(activeMeleeWeapon) {
+                this.meleeGuardTicks = 0;
+            } else {
+                this.meleeGuardTicks -= 1;
+                if this.meleeGuardTicks == 10 {
+                    this.UnequipWeapon(remote);
+                };
+            };
             if this.meleeGuardTicks == 0 {
                 this.meleePending = false;
                 this.ExecuteMelee(remote);
@@ -229,41 +233,6 @@ public class CPMRemoteVisual extends IScriptable {
         };
     }
 
-    private func ControlledVerticalZ(networkZ: Float, detailed: Int32) -> Float {
-        let jumping: Bool = detailed == 18 || detailed == 19 || detailed == 20 || detailed == 21;
-        let falling: Bool = detailed == 14;
-        let landing: Bool = detailed >= 23 && detailed <= 27;
-
-        if jumping {
-            if !this.airborne {
-                this.groundZ = this.visualPosition.Z;
-                this.verticalOffset = 0.0;
-            };
-            this.verticalOffset += 0.075;
-            if this.verticalOffset > 1.45 { this.verticalOffset = 1.45; };
-            return this.groundZ + this.verticalOffset;
-        };
-
-        if falling {
-            if !this.airborne {
-                this.groundZ = this.visualPosition.Z - this.verticalOffset;
-            };
-            this.verticalOffset -= 0.075;
-            if this.verticalOffset < 0.0 { this.verticalOffset = 0.0; };
-            return this.groundZ + this.verticalOffset;
-        };
-
-        if landing {
-            this.verticalOffset = 0.0;
-            this.groundZ = networkZ;
-            return this.groundZ;
-        };
-
-        this.verticalOffset = 0.0;
-        this.groundZ = networkZ;
-        return networkZ;
-    }
-
     private func UpdateAirState(remote: ref<NPCPuppet>, detailed: Int32) -> Void {
         if detailed == this.lastDetailedLocomotion { return; };
         let jumping: Bool = detailed == 18 || detailed == 19 || detailed == 20 || detailed == 21;
@@ -273,27 +242,17 @@ public class CPMRemoteVisual extends IScriptable {
         if jumping {
             this.ForceStanding(remote);
             this.StopLocomotion(remote);
-            let air: ref<AnimFeature_PlayerLocomotionStateMachine> = new AnimFeature_PlayerLocomotionStateMachine();
-            air.inAirState = true;
-            AnimationControllerComponent.ApplyFeature(remote, n"LocomotionStateMachine", air);
-            let movement: ref<AnimFeature_PlayerMovement> = new AnimFeature_PlayerMovement();
+            let movement: ref<AnimFeature_Movement> = new AnimFeature_Movement();
             movement.SetSpeed(CPMRemoteVelocity(this.playerID));
-            movement.SetVerticalSpeed(7.0);
-            AnimationControllerComponent.ApplyFeature(remote, n"PlayerMovement", movement);
+            AnimationControllerComponent.ApplyFeature(remote, n"Movement", movement);
             AnimationControllerComponent.PushEventToReplicate(remote, n"Jump");
             AnimationControllerComponent.PushEventToReplicate(remote, n"InAir");
             this.airborne = true;
         };
 
         if falling {
-            let air: ref<AnimFeature_PlayerLocomotionStateMachine> = new AnimFeature_PlayerLocomotionStateMachine();
-            air.inAirState = true;
-            AnimationControllerComponent.ApplyFeature(remote, n"LocomotionStateMachine", air);
-            let movement: ref<AnimFeature_PlayerMovement> = new AnimFeature_PlayerMovement();
-            movement.SetSpeed(CPMRemoteVelocity(this.playerID));
-            movement.SetVerticalSpeed(-7.0);
-            AnimationControllerComponent.ApplyFeature(remote, n"PlayerMovement", movement);
             AnimationControllerComponent.PushEventToReplicate(remote, n"InAir");
+            AnimationControllerComponent.PushEventToReplicate(remote, n"Fall");
             this.airborne = true;
         };
 
@@ -303,13 +262,7 @@ public class CPMRemoteVisual extends IScriptable {
             landingFeature.impactSpeed = -7.0;
             AnimationControllerComponent.ApplyFeature(remote, n"Landing", landingFeature);
             AnimationControllerComponent.PushEventToReplicate(remote, n"Land");
-            let ground: ref<AnimFeature_PlayerLocomotionStateMachine> = new AnimFeature_PlayerLocomotionStateMachine();
-            ground.inAirState = false;
-            AnimationControllerComponent.ApplyFeature(remote, n"LocomotionStateMachine", ground);
-            let movement: ref<AnimFeature_PlayerMovement> = new AnimFeature_PlayerMovement();
-            movement.SetSpeed(0.0);
-            movement.SetVerticalSpeed(0.0);
-            AnimationControllerComponent.ApplyFeature(remote, n"PlayerMovement", movement);
+            AnimationControllerComponent.PushEventToReplicate(remote, n"Landing");
             this.ForceStanding(remote);
             this.airborne = false;
         };
@@ -400,8 +353,8 @@ public class CPMRemoteVisual extends IScriptable {
         this.UnequipWeapon(remote);
         this.weaponRequested = false;
         this.meleePending = true;
-        // Give the unequip command enough time to clear WeaponRight before punching.
-        this.meleeGuardTicks = 12;
+        // Allow the real unequip command to clear WeaponRight before punching.
+        this.meleeGuardTicks = 20;
     }
 
     private func ExecuteMelee(remote: ref<NPCPuppet>) -> Void {
@@ -453,7 +406,7 @@ public class CPMRemoteVisual extends IScriptable {
         let detailed: Int32 = CPMRemoteDetailedLocomotion(this.playerID);
         let specialAction: Bool = detailed == 14 || detailed >= 18 && detailed <= 27 || CPMRemoteAiming(this.playerID) ||
             CPMRemoteWeaponState(this.playerID) == 2 || CPMRemoteWeaponState(this.playerID) == 8 ||
-            CPMRemoteMeleeEvent(this.playerID) != this.lastMeleeEvent;
+            CPMRemoteMeleeEvent(this.playerID) != this.lastMeleeEvent || this.meleePending;
         if specialAction {
             this.StopLocomotion(remote);
             this.locomotionState = 0;
@@ -516,7 +469,8 @@ public class CPMRemoteVisual extends IScriptable {
         else {
             this.visualPosition.X += dx * 0.18;
             this.visualPosition.Y += dy * 0.18;
-            this.visualPosition.Z += dz * 0.18;
+            if this.airborne { this.visualPosition.Z = target.Z; }
+            else { this.visualPosition.Z += dz * 0.18; };
             this.visualPosition.W = 1.0;
         };
         let networkYaw: Float = CPMRemoteYaw(this.playerID);
