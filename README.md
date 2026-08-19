@@ -1,40 +1,33 @@
-# CPM 0.2.0.0 — Native Movement Diagnostics
+# CPM 0.2.0.1 — Smooth Air + Forced Holster + Melee Range
 
-Esta versão inicia a substituição do controlador visual provisório após os testes 0.1.0.5 e 0.1.0.6 comprovarem que os pacotes chegam, mas o NPC ignora parte dos eventos de animação.
+Esta versão preserva a caminhada, corrida e retorno confirmados como funcionais no teste 0.2.0.0.
 
-## Mudanças estruturais
+## Correções desta rodada
 
-- Locomoção em movimento deixa de ser sobrescrita por teleporte a cada atualização.
-- `AIMoveToCommand` passa a controlar caminhada, corrida, agachamento e retorno enquanto o erro de posição permanece seguro.
-- Salto e queda usam `AITeleportCommand` com trajetória Z real.
-- O collider do boneco remoto é desativado durante o teste para impedir que a física o prenda imediatamente ao chão.
-- O controlador de IA recebe `ForceTickNextFrame` durante o movimento aéreo.
-- Estados reais dos comandos de movimento e melee são consultados por `GetCommandState`.
-- A DLL recebe relatórios do REDscript e grava no `CPMClient.log`:
-  - entidade preparada;
-  - comando aceito ou rejeitado;
-  - estado do movimento;
-  - salto, queda e aterrissagem;
-  - guardar arma;
-  - estado do comando melee.
-- Corrigida a mensagem interna do cliente que ainda mostrava 0.1.0.5.
+- Removida a fila de `AITeleportCommand` criada a cada quadro aéreo.
+- Salto agora usa transformação contínua com collider desativado.
+- Curva aérea reduzida para aproximadamente 0,75 s de subida e 0,75 s de queda.
+- Subida desacelera perto do ápice e queda acelera até o chão.
+- O retorno continua sendo controlado pela IA, sem teleporte constante.
+- Se `AIUnequipCommand` não esvaziar `WeaponRight`, o item é removido diretamente do slot.
+- Antes do melee, o NPC é colocado a 1,60 m do jogador e virado para ele.
+- Duração do comando melee aumentada para 3 segundos.
+- Diagnósticos registram remoção forçada da arma e reposicionamento de combate.
 
 ## Artifact
 
 ```text
-CPM-Windows-0.2.0.0-Native-Movement-Diagnostics
+CPM-Windows-0.2.0.1-Smooth-Air-Holster-Melee
 ```
 
-## Teste
+## Execução
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
 ```
 
-Depois:
+Depois envie:
 
 ```powershell
 Get-Content "$env:LOCALAPPDATA\CPM\logs\CPMClient.log" -Tail 120
 ```
-
-Esta é uma versão de mudança estrutural e diagnóstico. O teste dentro do jogo determinará quais comandos o grafo do NPC aceita e quais ações exigirão um arquivo de animação/workspot próprio.

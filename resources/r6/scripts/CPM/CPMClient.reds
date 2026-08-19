@@ -50,7 +50,6 @@ public class CPMRemoteVisual extends IScriptable {
     private let activeAimCommand: ref<AIAimAtTargetCommand>;
     private let activeShootCommand: ref<AIShootCommand>;
     private let activeMeleeCommand: ref<AIMeleeAttackCommand>;
-    private let activeTeleportCommand: ref<AITeleportCommand>;
     private let controllerPrepared: Bool;
     private let lastMoveCommandState: Int32;
     private let lastMeleeCommandState: Int32;
@@ -223,6 +222,12 @@ public class CPMRemoteVisual extends IScriptable {
                 this.meleeGuardTicks -= 1;
                 if this.meleeGuardTicks == 10 {
                     this.UnequipWeapon(remote);
+                    let transactionSystem: ref<TransactionSystem> = GameInstance.GetTransactionSystem(remote.GetGame());
+                    if IsDefined(transactionSystem) {
+                        if transactionSystem.RemoveItemFromSlot(remote, t"AttachmentSlots.WeaponRight", true, false, true) {
+                            CPMReportVisualAction(this.playerID, 7, 5);
+                        };
+                    };
                 };
             };
             if this.meleeGuardTicks == 0 {
@@ -370,6 +375,7 @@ public class CPMRemoteVisual extends IScriptable {
             this.reloadTicks = 0;
         };
         this.lastAiming = false;
+        this.MoveIntoMeleeRange(remote);
         this.ForceStanding(remote);
         this.UnequipWeapon(remote);
         this.weaponRequested = false;
@@ -386,7 +392,7 @@ public class CPMRemoteVisual extends IScriptable {
         };
         let command: ref<AIMeleeAttackCommand> = new AIMeleeAttackCommand();
         command.targetOverridePuppetRef = this.PlayerReference();
-        command.duration = 1.50;
+        command.duration = 3.00;
         if remote.GetAIControllerComponent().SendCommand(command) {
             this.activeMeleeCommand = command;
             CPMReportVisualAction(this.playerID, 11, 1);
@@ -490,19 +496,28 @@ public class CPMRemoteVisual extends IScriptable {
     }
 
     private func ApplyAirTransform(remote: ref<NPCPuppet>, target: Vector4) -> Void {
-        if IsDefined(this.activeTeleportCommand) {
-            remote.GetAIControllerComponent().CancelCommand(this.activeTeleportCommand);
-            this.activeTeleportCommand = null;
-        };
-        let command: ref<AITeleportCommand> = new AITeleportCommand();
-        command.position = target;
-        command.rotation = CPMRemoteYaw(this.playerID);
-        command.doNavTest = false;
-        if remote.GetAIControllerComponent().SendCommand(command) {
-            this.activeTeleportCommand = command;
-        };
+        this.visualPosition.X += (target.X - this.visualPosition.X) * 0.35;
+        this.visualPosition.Y += (target.Y - this.visualPosition.Y) * 0.35;
+        this.visualPosition.Z = target.Z;
+        this.visualPosition.W = 1.0;
+        let angles: EulerAngles;
+        angles.Pitch = 0.0;
+        angles.Roll = 0.0;
+        angles.Yaw = CPMRemoteYaw(this.playerID);
+        GameInstance.GetTeleportationFacility(this.player.GetGame()).Teleport(remote, this.visualPosition, angles);
         remote.GetAIControllerComponent().ForceTickNextFrame();
-        this.visualPosition = target;
+    }
+
+    private func MoveIntoMeleeRange(remote: ref<NPCPuppet>) -> Void {
+        let playerPosition: Vector4 = this.player.GetWorldPosition();
+        let playerForward: Vector4 = this.player.GetWorldForward();
+        let meleePosition: Vector4 = playerPosition + playerForward * 1.60;
+        let meleeAngles: EulerAngles = Quaternion.ToEulerAngles(this.player.GetWorldOrientation());
+        meleeAngles.Yaw += 180.0;
+        GameInstance.GetTeleportationFacility(this.player.GetGame()).Teleport(remote, meleePosition, meleeAngles);
+        this.visualPosition = meleePosition;
+        remote.GetAIControllerComponent().ForceTickNextFrame();
+        CPMReportVisualAction(this.playerID, 12, 5);
     }
 
     private func ReportCommandStates(remote: ref<NPCPuppet>) -> Void {

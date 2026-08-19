@@ -1,13 +1,13 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $server = Join-Path $root "CPMServer.exe"
-$simulator = Join-Path $root "tools\CPM-Native-Driver-Test-0.2.0.0.ps1"
+$simulator = Join-Path $root "tools\CPM-Smooth-Air-Melee-Test-0.2.0.1.ps1"
 
 if (!(Test-Path $server)) { throw "CPMServer.exe nao encontrado em $root" }
 if (!(Test-Path $simulator)) { throw "Teste visual nao encontrado em $simulator" }
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host " CPM 0.2.0.0 - NATIVE MOVEMENT + DIAGNOSTICS" -ForegroundColor Cyan
+Write-Host " CPM 0.2.0.1 - SMOOTH AIR + HOLSTER + MELEE RANGE" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
 $serverProcess = Start-Process -FilePath $server -WorkingDirectory $root -PassThru
