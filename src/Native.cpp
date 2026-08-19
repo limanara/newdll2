@@ -1,7 +1,9 @@
 #include "Native.hpp"
 #include "Client.hpp"
+#include "Logger.hpp"
 #include <RedLib.hpp>
 #include <atomic>
+#include <format>
 
 namespace CPM {
 static std::atomic<Client*> s_client{nullptr};
@@ -13,6 +15,12 @@ void CPMSubmitState(float x,float y,float z,float forwardX,float forwardY,float 
     bool weaponEquipped,bool aiming){
     if(auto* client=CPM::s_client.load())client->SendPlayerState(x,y,z,forwardX,forwardY,aimX,aimY,aimZ,
         locomotion,detailedLocomotion,upperBody,weaponState,meleeState,weaponType,weaponEquipped,aiming);
+}
+
+void CPMReportVisualAction(int32_t playerID,int32_t action,int32_t state){
+    static const char* names[]={"desconhecida","entidade","movimento","salto","queda","aterrissagem","equipar","guardar arma","mirar","tiro","recarga","melee","teleporte"};
+    const char* name=action>=1&&action<=12?names[action]:"desconhecida";
+    CPM::Logger::Get().Info(std::format("Visual remoto {} | Acao {} | Estado {}",playerID,name,state));
 }
 
 int32_t CPMRemoteCount(){
@@ -56,6 +64,7 @@ int32_t CPMRemoteMeleeEvent(int32_t id){CPM::Client::RemoteSnapshot snapshot{};r
 
 RTTI_DEFINE_GLOBALS({
     RTTI_FUNCTION(CPMSubmitState);
+    RTTI_FUNCTION(CPMReportVisualAction);
     RTTI_FUNCTION(CPMRemoteCount);
     RTTI_FUNCTION(CPMRemoteIdAt);
     RTTI_FUNCTION(CPMRemoteExists);

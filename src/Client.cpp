@@ -117,7 +117,7 @@ void Client::Run(ConnectionConfig config){
     {std::scoped_lock lock(socketMutex_);socket_=socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);}if(socket_==INVALID_SOCKET){Logger::Get().Error("Não foi possível criar o socket UDP.");running_=false;return;}
     DWORD timeout=100;setsockopt(socket_,SOL_SOCKET,SO_RCVTIMEO,reinterpret_cast<const char*>(&timeout),sizeof(timeout));server_={};server_.sin_family=AF_INET;server_.sin_port=htons(config.port);
     if(inet_pton(AF_INET,config.address.c_str(),&server_.sin_addr)!=1){addrinfo hints{};hints.ai_family=AF_INET;hints.ai_socktype=SOCK_DGRAM;addrinfo* result{};if(getaddrinfo(config.address.c_str(),nullptr,&hints,&result)!=0||!result){Logger::Get().Error("Endereço do servidor inválido.");running_=false;return;}server_.sin_addr=reinterpret_cast<sockaddr_in*>(result->ai_addr)->sin_addr;freeaddrinfo(result);}
-    Logger::Get().Info(std::format("CPM 0.1.0.5 Native Air + Equip + Melee Controller conectando a {}:{}...",config.address,config.port));
+    Logger::Get().Info(std::format("CPM 0.2.0.0 Native Movement + Command Diagnostics conectando a {}:{}...",config.address,config.port));
     auto lastHello=Clock::now()-std::chrono::seconds(5),lastHeartbeat=lastHello,lastStats=Clock::now();lastServerPacket_=Clock::now();char packet[512];
     while(running_){
         const auto now=Clock::now();
