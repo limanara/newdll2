@@ -1,33 +1,30 @@
-# CPM 0.2.0.1 — Smooth Air + Forced Holster + Melee Range
+# CPM 0.2.0.2 — Air Locomotion + Verified Holster + Melee Puppet
 
-Esta versão preserva a caminhada, corrida e retorno confirmados como funcionais no teste 0.2.0.0.
+Esta versão corrige os dois bloqueios comprovados pelos logs do teste 0.2.0.1.
 
-## Correções desta rodada
+## Correções
 
-- Removida a fila de `AITeleportCommand` criada a cada quadro aéreo.
-- Salto agora usa transformação contínua com collider desativado.
-- Curva aérea reduzida para aproximadamente 0,75 s de subida e 0,75 s de queda.
-- Subida desacelera perto do ápice e queda acelera até o chão.
-- O retorno continua sendo controlado pela IA, sem teleporte constante.
-- Se `AIUnequipCommand` não esvaziar `WeaponRight`, o item é removido diretamente do slot.
-- Antes do melee, o NPC é colocado a 1,60 m do jogador e virado para ele.
-- Duração do comando melee aumentada para 3 segundos.
-- Diagnósticos registram remoção forçada da arma e reposicionamento de combate.
+- A fase aérea não cancela mais o controlador de locomocao do NPC.
+- Salto e queda mantêm uma animação-base ativa enquanto o eixo Z é sincronizado.
+- A remoção de arma possui temporizador próprio e não depende mais do evento melee.
+- O slot `WeaponRight` é verificado depois da remoção; o log registra estado 5 para sucesso e 6 para falha.
+- O melee também força o esvaziamento do slot antes de enviar o ataque.
+- O puppet remoto agora usa um archetype com suporte nativo a combate desarmado.
+- O retorno continua usando movimento de IA, preservando a corrida já confirmada.
+- O log final foi ampliado para 120 linhas.
+
+## Limite conhecido
+
+O salto ainda é uma aproximação de sincronização de NPC. A animação autêntica de jogador remoto exigirá um driver/workspot próprio com recursos de animação do jogo. Este teste verifica se o congelamento foi eliminado e se a trajetória, o holster e o melee avançaram.
 
 ## Artifact
 
 ```text
-CPM-Windows-0.2.0.1-Smooth-Air-Holster-Melee
+CPM-Windows-0.2.0.2-Air-Locomotion-Holster-Melee-Puppet
 ```
 
 ## Execução
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
-```
-
-Depois envie:
-
-```powershell
-Get-Content "$env:LOCALAPPDATA\CPM\logs\CPMClient.log" -Tail 120
 ```

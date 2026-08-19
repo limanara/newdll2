@@ -60,6 +60,7 @@ public class CPMRemoteVisual extends IScriptable {
     private let airborne: Bool;
     private let meleePending: Bool;
     private let meleeGuardTicks: Int32;
+    private let holsterGuardTicks: Int32;
 
     public func Initialize(player: ref<PlayerPuppet>, playerID: Int32, slot: Int32) -> Void {
         this.player = player;
@@ -92,6 +93,7 @@ public class CPMRemoteVisual extends IScriptable {
         this.airborne = false;
         this.meleePending = false;
         this.meleeGuardTicks = 0;
+        this.holsterGuardTicks = 0;
         this.controllerPrepared = false;
         this.lastMoveCommandState = -999;
         this.lastMeleeCommandState = -999;
@@ -195,8 +197,17 @@ public class CPMRemoteVisual extends IScriptable {
         if !remoteWeaponEquipped {
             if this.weaponRequested && !this.weaponUnequipRequested {
                 this.UnequipWeapon(remote);
+                this.holsterGuardTicks = 8;
+            };
+            if this.holsterGuardTicks > 0 {
+                this.holsterGuardTicks -= 1;
+                if this.holsterGuardTicks == 0 {
+                    this.ForceHolster(remote);
+                };
             };
             this.weaponRequested = false;
+        } else {
+            this.holsterGuardTicks = 0;
         };
         let weapon: ref<WeaponObject> = GameObject.GetActiveWeapon(remote);
         let shotEvent: Int32 = CPMRemoteShotEvent(this.playerID);
@@ -222,12 +233,7 @@ public class CPMRemoteVisual extends IScriptable {
                 this.meleeGuardTicks -= 1;
                 if this.meleeGuardTicks == 10 {
                     this.UnequipWeapon(remote);
-                    let transactionSystem: ref<TransactionSystem> = GameInstance.GetTransactionSystem(remote.GetGame());
-                    if IsDefined(transactionSystem) {
-                        if transactionSystem.RemoveItemFromSlot(remote, t"AttachmentSlots.WeaponRight", true, false, true) {
-                            CPMReportVisualAction(this.playerID, 7, 5);
-                        };
-                    };
+                    this.ForceHolster(remote);
                 };
             };
             if this.meleeGuardTicks == 0 {
@@ -262,7 +268,6 @@ public class CPMRemoteVisual extends IScriptable {
 
         if jumping {
             this.ForceStanding(remote);
-            this.StopLocomotion(remote);
             let movement: ref<AnimFeature_Movement> = new AnimFeature_Movement();
             movement.SetSpeed(CPMRemoteVelocity(this.playerID));
             AnimationControllerComponent.ApplyFeature(remote, n"Movement", movement);
@@ -309,6 +314,23 @@ public class CPMRemoteVisual extends IScriptable {
         else { CPMReportVisualAction(this.playerID, 7, -1); };
         this.weaponUnequipRequested = true;
         AnimationControllerComponent.PushEventToReplicate(remote, n"Unequip");
+    }
+
+    private func ForceHolster(remote: ref<NPCPuppet>) -> Void {
+        let transactionSystem: ref<TransactionSystem> = GameInstance.GetTransactionSystem(remote.GetGame());
+        if !IsDefined(transactionSystem) {
+            CPMReportVisualAction(this.playerID, 7, 6);
+            return;
+        };
+        let removed: Bool = transactionSystem.RemoveItemFromSlot(
+            remote, t"AttachmentSlots.WeaponRight", true, false, true
+        );
+        let slotEmpty: Bool = transactionSystem.IsSlotEmpty(remote, t"AttachmentSlots.WeaponRight");
+        if removed || slotEmpty {
+            CPMReportVisualAction(this.playerID, 7, 5);
+        } else {
+            CPMReportVisualAction(this.playerID, 7, 6);
+        };
     }
 
     private func PlayerReference() -> EntityReference {
@@ -378,6 +400,7 @@ public class CPMRemoteVisual extends IScriptable {
         this.MoveIntoMeleeRange(remote);
         this.ForceStanding(remote);
         this.UnequipWeapon(remote);
+        this.ForceHolster(remote);
         this.weaponRequested = false;
         this.meleePending = true;
         // Allow the real unequip command to clear WeaponRight before punching.
@@ -412,7 +435,7 @@ public class CPMRemoteVisual extends IScriptable {
         let entitySystem: ref<DynamicEntitySystem> = GameInstance.GetDynamicEntitySystem();
         if !IsDefined(entitySystem) || !entitySystem.IsReady() { return; };
         let spec: ref<DynamicEntitySpec> = new DynamicEntitySpec();
-        spec.recordID = t"Character.spr_animals_bouncer1_ranged1_omaha_mb";
+        spec.recordID = t"Character.animals_bouncer2_melee2_fists_mb";
         spec.appearanceName = n"random";
         spec.position = this.localAnchor;
         let spawnAngles: EulerAngles;
@@ -434,7 +457,8 @@ public class CPMRemoteVisual extends IScriptable {
         let requestedState: Int32 = 0;
         let networkLocomotion: Int32 = CPMRemoteLocomotion(this.playerID);
         let detailed: Int32 = CPMRemoteDetailedLocomotion(this.playerID);
-        let specialAction: Bool = detailed == 14 || detailed >= 18 && detailed <= 27 || CPMRemoteAiming(this.playerID) ||
+        let airAction: Bool = detailed == 14 || detailed >= 18 && detailed <= 27;
+        let specialAction: Bool = CPMRemoteAiming(this.playerID) ||
             CPMRemoteWeaponState(this.playerID) == 2 || CPMRemoteWeaponState(this.playerID) == 8 ||
             CPMRemoteMeleeEvent(this.playerID) != this.lastMeleeEvent || this.meleePending;
         if specialAction {
@@ -444,9 +468,13 @@ public class CPMRemoteVisual extends IScriptable {
             this.locomotionCandidateTicks = 0;
             return;
         };
-        if networkLocomotion == 1 || detailed == 3 || detailed == 30 { requestedState = 3; }
-        else { if networkLocomotion == 2 || networkLocomotion == 11 || detailed == 4 { requestedState = 2; }
-        else { if CPMRemoteVelocity(this.playerID) > 0.20 { requestedState = 1; }; }; };
+        if airAction {
+            requestedState = 1;
+        } else {
+            if networkLocomotion == 1 || detailed == 3 || detailed == 30 { requestedState = 3; }
+            else { if networkLocomotion == 2 || networkLocomotion == 11 || detailed == 4 { requestedState = 2; }
+            else { if CPMRemoteVelocity(this.playerID) > 0.20 { requestedState = 1; }; }; };
+        };
         if requestedState != this.locomotionCandidate {
             this.locomotionCandidate = requestedState;
             this.locomotionCandidateTicks = 1;
