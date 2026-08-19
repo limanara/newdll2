@@ -1,4 +1,4 @@
-name: Build CPM 0.1.0.3 Native Actions
+name: Build CPM 0.1.0.5 Native Air + Equip + Melee Controller
 
 on:
   workflow_dispatch:
@@ -31,7 +31,7 @@ jobs:
           Copy-Item "build\Release\CPMClient.dll" "package\red4ext\plugins\CPMClient\CPMClient.dll" -Force
           Copy-Item "build\Release\CPMServer.exe" "package\CPMServer.exe" -Force
           Copy-Item "resources\r6\scripts\CPM\CPMClient.reds" "package\r6\scripts\CPM\CPMClient.reds" -Force
-          Copy-Item "tools\CPM-Native-Actions-Test-0.1.0.3.ps1" "package\tools\CPM-Native-Actions-Test-0.1.0.3.ps1" -Force
+          Copy-Item "tools\CPM-Air-Melee-Test-0.1.0.5.ps1" "package\tools\CPM-Air-Melee-Test-0.1.0.5.ps1" -Force
           Copy-Item "Start-Visual-Test.ps1" "package\Start-Visual-Test.ps1" -Force
           Copy-Item "connection.example.json" "package\connection.example.json" -Force
           Copy-Item "install-client.bat" "package\install-client.bat" -Force
@@ -47,10 +47,10 @@ jobs:
 
           Get-ChildItem "package" -Recurse
 
-      - name: Enviar CPM 0.1.0.3 Native Actions
+      - name: Enviar CPM 0.1.0.5 Native Air Equip Melee
         uses: actions/upload-artifact@v4
         with:
-          name: CPM-Windows-0.1.0.3-Native-Actions
+          name: CPM-Windows-0.1.0.5-Native-Air-Equip-Melee
           path: package
           if-no-files-found: error
           retention-days: 30
