@@ -17,6 +17,12 @@ void CPMSubmitState(float x,float y,float z,float forwardX,float forwardY,float 
         locomotion,detailedLocomotion,upperBody,weaponState,meleeState,weaponType,weaponEquipped,aiming);
 }
 
+void CPMReportAirSample(int32_t playerID,int32_t phase,float networkZ,float actualZ,float startZ,float peakZ){
+    CPM::Logger::Get().Info(std::format(
+        "Ar remoto {} | Fase {} | Rede Z {:.3f} | Real Z {:.3f} | Inicio {:.3f} | Pico {:.3f} | Altura {:.3f}",
+        playerID,phase,networkZ,actualZ,startZ,peakZ,actualZ-startZ));
+}
+
 void CPMReportVisualAction(int32_t playerID,int32_t action,int32_t state){
     static const char* names[]={"desconhecida","entidade","movimento","salto","queda","aterrissagem","equipar","guardar arma","mirar","tiro","recarga","melee","teleporte"};
     const char* name=action>=1&&action<=12?names[action]:"desconhecida";
@@ -65,6 +71,7 @@ int32_t CPMRemoteMeleeEvent(int32_t id){CPM::Client::RemoteSnapshot snapshot{};r
 RTTI_DEFINE_GLOBALS({
     RTTI_FUNCTION(CPMSubmitState);
     RTTI_FUNCTION(CPMReportVisualAction);
+    RTTI_FUNCTION(CPMReportAirSample);
     RTTI_FUNCTION(CPMRemoteCount);
     RTTI_FUNCTION(CPMRemoteIdAt);
     RTTI_FUNCTION(CPMRemoteExists);

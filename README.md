@@ -1,30 +1,25 @@
-# CPM 0.2.0.2 — Air Locomotion + Verified Holster + Melee Puppet
+# CPM 0.3.0.0 — Physical Air Driver + Diagnostics
 
-Esta versão corrige os dois bloqueios comprovados pelos logs do teste 0.2.0.1.
+A versão 0.2.0.2 permanece como base aprovada para locomoção terrestre, arma, recarga, holster e melee.
 
-## Correções
+## Mudança estrutural
 
-- A fase aérea não cancela mais o controlador de locomocao do NPC.
-- Salto e queda mantêm uma animação-base ativa enquanto o eixo Z é sincronizado.
-- A remoção de arma possui temporizador próprio e não depende mais do evento melee.
-- O slot `WeaponRight` é verificado depois da remoção; o log registra estado 5 para sucesso e 6 para falha.
-- O melee também força o esvaziamento do slot antes de enviar o ataque.
-- O puppet remoto agora usa um archetype com suporte nativo a combate desarmado.
-- O retorno continua usando movimento de IA, preservando a corrida já confirmada.
-- O log final foi ampliado para 120 linhas.
-
-## Limite conhecido
-
-O salto ainda é uma aproximação de sincronização de NPC. A animação autêntica de jogador remoto exigirá um driver/workspot próprio com recursos de animação do jogo. Este teste verifica se o congelamento foi eliminado e se a trajetória, o holster e o melee avançaram.
+- O collider do puppet remoto permanece ativo.
+- O início do salto envia um `PhysicalImpulseEvent` vertical apenas uma vez.
+- Nenhum teleporte é executado durante a fase aérea.
+- A gravidade e o character controller do jogo passam a controlar a trajetória.
+- A posição Z real da entidade é medida durante todo o salto.
+- A aterrissagem só finaliza quando há proximidade com o Z inicial ou timeout de segurança.
+- Logs comparam Z recebido da rede, Z real, início, pico e altura atingida.
 
 ## Artifact
 
-```text
-CPM-Windows-0.2.0.2-Air-Locomotion-Holster-Melee-Puppet
-```
+`CPM-Windows-0.3.0.0-Physical-Air-Driver-Diagnostics`
 
 ## Execução
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
 ```
+
+Esta é uma versão experimental do novo controlador aéreo. Se o puppet ignorar o impulso, o log demonstrará isso objetivamente e a próxima etapa será substituir o archetype NPC por uma entidade TPP com move component próprio.
