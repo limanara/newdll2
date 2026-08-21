@@ -1,0 +1,9 @@
+Character.CPM_Remote_Player:
+  $base: Character.TPP_Player
+  entityTemplatePath: base\characters\entities\player\player_ma_tpp.ent
+  appearanceName: TPP_Body
+  priority: SpawnableObjectPriority.Regular
+  reactionPreset: ReactionPresets.NoReaction
+  abilities:
+    - Ability.CanCrouch
+    - Ability.CanSprint

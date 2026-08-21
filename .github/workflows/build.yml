@@ -1,9 +1,9 @@
-name: Build CPM 0.3.0.0 Physical Air Driver + Diagnostics
+name: Build CPM 0.4.0.0 TPP Air Foundation DEV
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, feature/tpp-air-controller-0.4.0.0]
 
 jobs:
   build:
@@ -19,6 +19,9 @@ jobs:
       - name: Compilar cliente e servidor
         run: cmake --build build --config Release --parallel
 
+      - name: Testar controlador aereo
+        run: ctest --test-dir build -C Release --output-on-failure
+
       - name: Preparar pacote
         shell: powershell
         run: |
@@ -27,10 +30,14 @@ jobs:
           New-Item -ItemType Directory -Force -Path "package\red4ext\plugins\CPMClient" | Out-Null
           New-Item -ItemType Directory -Force -Path "package\r6\scripts\CPM" | Out-Null
           New-Item -ItemType Directory -Force -Path "package\tools" | Out-Null
+          New-Item -ItemType Directory -Force -Path "package\r6\tweaks" | Out-Null
 
           Copy-Item "build\Release\CPMClient.dll" "package\red4ext\plugins\CPMClient\CPMClient.dll" -Force
           Copy-Item "build\Release\CPMServer.exe" "package\CPMServer.exe" -Force
           Copy-Item "resources\r6\scripts\CPM\CPMClient.reds" "package\r6\scripts\CPM\CPMClient.reds" -Force
+          Copy-Item "resources\r6\tweaks\CPM.yaml" "package\r6\tweaks\CPM.yaml" -Force
+          Copy-Item "DEPENDENCIES-0.4.0.0.md" "package\DEPENDENCIES-0.4.0.0.md" -Force
+          Copy-Item "ARCHITECTURE-0.4.0.0.md" "package\ARCHITECTURE-0.4.0.0.md" -Force
           Copy-Item "tools\CPM-Physical-Air-Test-0.3.0.0.ps1" "package\tools\CPM-Physical-Air-Test-0.3.0.0.ps1" -Force
           Copy-Item "Start-Visual-Test.ps1" "package\Start-Visual-Test.ps1" -Force
           Copy-Item "connection.example.json" "package\connection.example.json" -Force
@@ -48,10 +55,10 @@ jobs:
 
           Get-ChildItem "package" -Recurse
 
-      - name: Enviar CPM 0.3.0.0 Physical Air Driver Diagnostics
+      - name: Enviar fundacao CPM 0.4.0.0 TPP Air DEV
         uses: actions/upload-artifact@v4
         with:
-          name: CPM-Windows-0.3.0.0-Physical-Air-Driver-Diagnostics
+          name: CPM-Windows-0.4.0.0-TPP-Air-Foundation-DEV
           path: package
           if-no-files-found: error
           retention-days: 30
