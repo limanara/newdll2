@@ -1,7 +1,7 @@
 Character.CPM_Remote_Player:
-  $base: Character.TPP_Player
-  entityTemplatePath: base\characters\entities\player\player_ma_tpp.ent
-  appearanceName: TPP_Body
+  $base: Character.animals_bouncer2_melee2_fists_mb
+  entityTemplatePath: cpm\entities\cpm_remote_player.ent
+  appearanceName: default
   priority: SpawnableObjectPriority.Regular
   reactionPreset: ReactionPresets.NoReaction
   abilities:

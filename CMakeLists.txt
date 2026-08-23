@@ -25,3 +25,7 @@ add_test(NAME CPMAirControllerTests COMMAND CPMAirControllerTests)
 add_executable(CPMRemoteAirRuntimeTests tests/RemoteAirRuntimeTests.cpp src/AirController.cpp src/RemoteAirRuntime.cpp)
 target_include_directories(CPMRemoteAirRuntimeTests PRIVATE src)
 add_test(NAME CPMRemoteAirRuntimeTests COMMAND CPMRemoteAirRuntimeTests)
+
+add_executable(CPMRemoteAvatarControllerTests tests/RemoteAvatarControllerTests.cpp src/AirController.cpp src/RemoteAvatarController.cpp)
+target_include_directories(CPMRemoteAvatarControllerTests PRIVATE src)
+add_test(NAME CPMRemoteAvatarControllerTests COMMAND CPMRemoteAvatarControllerTests)
