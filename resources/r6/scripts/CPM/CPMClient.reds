@@ -1,3 +1,11 @@
+public static native func CPMAirBegin(playerID: Int32, groundZ: Float) -> Void
+public static native func CPMAirStep(playerID: Int32, deltaSeconds: Float) -> Float
+public static native func CPMAirPhase(playerID: Int32) -> Int32
+public static native func CPMAirVelocityZ(playerID: Int32) -> Float
+public static native func CPMAirPeakZ(playerID: Int32) -> Float
+public static native func CPMAirReset(playerID: Int32, groundZ: Float) -> Void
+public static native func CPMAirRemove(playerID: Int32) -> Void
+
 public static native func CPMSubmitState(x: Float, y: Float, z: Float, forwardX: Float, forwardY: Float,
     aimX: Float, aimY: Float, aimZ: Float, locomotion: Int32, detailedLocomotion: Int32,
     upperBody: Int32, weaponState: Int32, meleeState: Int32, weaponType: Int32,

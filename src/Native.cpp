@@ -1,14 +1,26 @@
 #include "Native.hpp"
 #include "Client.hpp"
 #include "Logger.hpp"
+#include "RemoteAirRuntime.hpp"
 #include <RedLib.hpp>
 #include <atomic>
 #include <format>
 
 namespace CPM {
 static std::atomic<Client*> s_client{nullptr};
-void SetActiveClient(Client* client){s_client.store(client);}
+void SetActiveClient(Client* client){
+    s_client.store(client);
+    if(!client) RemoteAirRuntime::Get().Clear();
 }
+}
+
+void CPMAirBegin(int32_t playerID,float groundZ){if(playerID>=0)CPM::RemoteAirRuntime::Get().Begin(playerID,groundZ);}
+float CPMAirStep(int32_t playerID,float deltaSeconds){return playerID>=0?CPM::RemoteAirRuntime::Get().Step(playerID,deltaSeconds).z:0.0f;}
+int32_t CPMAirPhase(int32_t playerID){CPM::AirFrame f{};return CPM::RemoteAirRuntime::Get().Snapshot(playerID,f)?static_cast<int32_t>(f.phase):0;}
+float CPMAirVelocityZ(int32_t playerID){CPM::AirFrame f{};return CPM::RemoteAirRuntime::Get().Snapshot(playerID,f)?f.verticalVelocity:0.0f;}
+float CPMAirPeakZ(int32_t playerID){CPM::AirFrame f{};return CPM::RemoteAirRuntime::Get().Snapshot(playerID,f)?f.peakZ:0.0f;}
+void CPMAirReset(int32_t playerID,float groundZ){if(playerID>=0)CPM::RemoteAirRuntime::Get().Reset(playerID,groundZ);}
+void CPMAirRemove(int32_t playerID){if(playerID>=0)CPM::RemoteAirRuntime::Get().Remove(playerID);}
 
 void CPMSubmitState(float x,float y,float z,float forwardX,float forwardY,float aimX,float aimY,float aimZ,
     int32_t locomotion,int32_t detailedLocomotion,int32_t upperBody,int32_t weaponState,int32_t meleeState,int32_t weaponType,
@@ -69,6 +81,8 @@ int32_t CPMRemoteReloadEvent(int32_t id){CPM::Client::RemoteSnapshot snapshot{};
 int32_t CPMRemoteMeleeEvent(int32_t id){CPM::Client::RemoteSnapshot snapshot{};return GetRemote(id,snapshot)?static_cast<int32_t>(snapshot.meleeEvent):0;}
 
 RTTI_DEFINE_GLOBALS({
+    RTTI_FUNCTION(CPMAirBegin); RTTI_FUNCTION(CPMAirStep); RTTI_FUNCTION(CPMAirPhase);
+    RTTI_FUNCTION(CPMAirVelocityZ); RTTI_FUNCTION(CPMAirPeakZ); RTTI_FUNCTION(CPMAirReset); RTTI_FUNCTION(CPMAirRemove);
     RTTI_FUNCTION(CPMSubmitState);
     RTTI_FUNCTION(CPMReportVisualAction);
     RTTI_FUNCTION(CPMReportAirSample);
