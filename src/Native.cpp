@@ -35,6 +35,10 @@ void CPMReportAirSample(int32_t playerID,int32_t phase,float networkZ,float actu
         playerID,phase,networkZ,actualZ,startZ,peakZ,actualZ-startZ));
 }
 
+void CPMReportEntityType(int32_t playerID,bool gameObject,bool playerPuppet,bool npcPuppet){
+    CPM::Logger::Get().Info(std::format("Entidade remota {} | GameObject {} | PlayerPuppet {} | NPCPuppet {}",playerID,gameObject,npcPuppet?false:playerPuppet,npcPuppet));
+}
+
 void CPMReportVisualAction(int32_t playerID,int32_t action,int32_t state){
     static const char* names[]={"desconhecida","entidade","movimento","salto","queda","aterrissagem","equipar","guardar arma","mirar","tiro","recarga","melee","teleporte"};
     const char* name=action>=1&&action<=12?names[action]:"desconhecida";
@@ -85,6 +89,7 @@ RTTI_DEFINE_GLOBALS({
     RTTI_FUNCTION(CPMAirVelocityZ); RTTI_FUNCTION(CPMAirPeakZ); RTTI_FUNCTION(CPMAirReset); RTTI_FUNCTION(CPMAirRemove);
     RTTI_FUNCTION(CPMSubmitState);
     RTTI_FUNCTION(CPMReportVisualAction);
+    RTTI_FUNCTION(CPMReportEntityType);
     RTTI_FUNCTION(CPMReportAirSample);
     RTTI_FUNCTION(CPMRemoteCount);
     RTTI_FUNCTION(CPMRemoteIdAt);

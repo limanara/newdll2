@@ -1,3 +1,4 @@
+public static native func CPMReportEntityType(playerID: Int32, gameObject: Bool, playerPuppet: Bool, npcPuppet: Bool) -> Void
 public static native func CPMAirBegin(playerID: Int32, groundZ: Float) -> Void
 public static native func CPMAirStep(playerID: Int32, deltaSeconds: Float) -> Float
 public static native func CPMAirPhase(playerID: Int32) -> Int32
@@ -75,6 +76,7 @@ public class CPMRemoteVisual extends IScriptable {
     private let airStartZ: Float;
     private let airPeakZ: Float;
     private let lastAirZ: Float;
+    private let entityTypeReported: Bool;
 
     public func Initialize(player: ref<PlayerPuppet>, playerID: Int32, slot: Int32) -> Void {
         this.player = player;
@@ -113,6 +115,7 @@ public class CPMRemoteVisual extends IScriptable {
         this.airStartZ = 0.0;
         this.airPeakZ = 0.0;
         this.lastAirZ = 0.0;
+        this.entityTypeReported = false;
         this.controllerPrepared = false;
         this.lastMoveCommandState = -999;
         this.lastMeleeCommandState = -999;
@@ -127,6 +130,7 @@ public class CPMRemoteVisual extends IScriptable {
             if IsDefined(entitySystem) { entitySystem.DeleteEntity(this.entityID); };
             this.hasEntity = false;
         };
+        CPMAirRemove(this.playerID);
     }
 
     public func Update() -> Void {
@@ -140,15 +144,13 @@ public class CPMRemoteVisual extends IScriptable {
         let remote: ref<Entity> = entitySystem.GetEntity(this.entityID);
         if !IsDefined(remote) { return; };
         let remoteObject: ref<GameObject> = remote as GameObject;
+        let remotePlayer: ref<PlayerPuppet> = remote as PlayerPuppet;
         let remotePuppet: ref<NPCPuppet> = remote as NPCPuppet;
-        if !IsDefined(remoteObject) || !IsDefined(remotePuppet) { return; };
-        if !this.controllerPrepared {
-            // 0.3.0.0: keep the character controller/collider active so the
-            // engine can process a real PhysicalImpulseEvent and gravity.
-            remotePuppet.GetAIControllerComponent().ForceTickNextFrame();
-            this.controllerPrepared = true;
-            CPMReportVisualAction(this.playerID, 1, 1);
+        if !this.entityTypeReported {
+            CPMReportEntityType(this.playerID, IsDefined(remoteObject), IsDefined(remotePlayer), IsDefined(remotePuppet));
+            this.entityTypeReported = true;
         };
+        if !IsDefined(remoteObject) { return; };
         let detailed: Int32 = CPMRemoteDetailedLocomotion(this.playerID);
         let networkZ: Float = this.localAnchor.Z + CPMRemoteZ(this.playerID) - this.remoteOriginZ;
         let target: Vector4 = Vector4(
@@ -157,11 +159,88 @@ public class CPMRemoteVisual extends IScriptable {
             networkZ,
             1.0
         );
+        if IsDefined(remotePlayer) {
+            this.UpdateTppRemote(remotePlayer, target, detailed);
+            return;
+        };
+        if !IsDefined(remotePuppet) { return; };
+        if !this.controllerPrepared {
+            // 0.3.0.0: keep the character controller/collider active so the
+            // engine can process a real PhysicalImpulseEvent and gravity.
+            remotePuppet.GetAIControllerComponent().ForceTickNextFrame();
+            this.controllerPrepared = true;
+            CPMReportVisualAction(this.playerID, 1, 1);
+        };
         this.UpdateLocomotion(remotePuppet, target);
         this.UpdateNetworkStates(remotePuppet);
         if this.airborne { this.ApplyAirTransform(remotePuppet, target); }
         else { this.InterpolateTransform(remoteObject, target); };
         this.ReportCommandStates(remotePuppet);
+    }
+
+
+    private func UpdateTppRemote(remote: ref<PlayerPuppet>, target: Vector4, detailed: Int32) -> Void {
+        if detailed != this.lastDetailedLocomotion {
+            let jumping: Bool = detailed == 18 || detailed == 19 || detailed == 20 || detailed == 21;
+            let falling: Bool = detailed == 14;
+            let landing: Bool = detailed >= 23 && detailed <= 27;
+            if jumping && !this.airborne {
+                let actual: Vector4 = remote.GetWorldPosition();
+                this.airStartZ = actual.Z;
+                this.airPeakZ = actual.Z;
+                this.airPhase = 1;
+                this.airborne = true;
+                CPMAirBegin(this.playerID, actual.Z);
+                AnimationControllerComponent.PushEventToReplicate(remote, n"Jump");
+                AnimationControllerComponent.PushEventToReplicate(remote, n"InAir");
+                CPMReportVisualAction(this.playerID, 3, 1);
+            };
+            if falling && this.airborne {
+                AnimationControllerComponent.PushEventToReplicate(remote, n"Fall");
+            };
+            if landing && this.airborne {
+                CPMReportVisualAction(this.playerID, 5, 1);
+            };
+            this.lastDetailedLocomotion = detailed;
+        };
+        if this.airborne {
+            this.ApplyTppAirTransform(remote, target);
+        } else {
+            this.InterpolateTransform(remote, target);
+        };
+    }
+
+    private func ApplyTppAirTransform(remote: ref<PlayerPuppet>, target: Vector4) -> Void {
+        let previousPhase: Int32 = this.airPhase;
+        let airZ: Float = CPMAirStep(this.playerID, 0.05);
+        this.airPhase = CPMAirPhase(this.playerID);
+        this.visualPosition.X += (target.X - this.visualPosition.X) * 0.18;
+        this.visualPosition.Y += (target.Y - this.visualPosition.Y) * 0.18;
+        this.visualPosition.Z = airZ;
+        this.visualPosition.W = 1.0;
+        let angles: EulerAngles;
+        angles.Pitch = 0.0;
+        angles.Roll = 0.0;
+        angles.Yaw = CPMRemoteYaw(this.playerID);
+        GameInstance.GetTeleportationFacility(this.player.GetGame()).Teleport(remote, this.visualPosition, angles);
+        if this.airPhase == 2 && previousPhase != 2 {
+            AnimationControllerComponent.PushEventToReplicate(remote, n"Fall");
+            CPMReportVisualAction(this.playerID, 4, 1);
+        };
+        if this.airPhase == 3 && previousPhase != 3 {
+            let landingFeature: ref<AnimFeature_Landing> = new AnimFeature_Landing();
+            landingFeature.type = 1;
+            landingFeature.impactSpeed = CPMAirVelocityZ(this.playerID);
+            AnimationControllerComponent.ApplyFeature(remote, n"Landing", landingFeature);
+            AnimationControllerComponent.PushEventToReplicate(remote, n"Land");
+            AnimationControllerComponent.PushEventToReplicate(remote, n"Landing");
+            CPMReportVisualAction(this.playerID, 5, 2);
+        };
+        if this.airPhase == 0 {
+            this.airborne = false;
+            CPMAirReset(this.playerID, this.visualPosition.Z);
+        };
+        CPMReportAirSample(this.playerID, this.airPhase, CPMRemoteZ(this.playerID), this.visualPosition.Z, this.airStartZ, CPMAirPeakZ(this.playerID));
     }
 
     private func UpdateNetworkStates(remote: ref<NPCPuppet>) -> Void {
@@ -464,8 +543,8 @@ public class CPMRemoteVisual extends IScriptable {
         let entitySystem: ref<DynamicEntitySystem> = GameInstance.GetDynamicEntitySystem();
         if !IsDefined(entitySystem) || !entitySystem.IsReady() { return; };
         let spec: ref<DynamicEntitySpec> = new DynamicEntitySpec();
-        spec.recordID = t"Character.animals_bouncer2_melee2_fists_mb";
-        spec.appearanceName = n"random";
+        spec.recordID = t"Character.CPM_Remote_Player";
+        spec.appearanceName = n"TPP_Body";
         spec.position = this.localAnchor;
         let spawnAngles: EulerAngles;
         spawnAngles.Pitch = 0.0;
