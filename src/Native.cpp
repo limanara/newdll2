@@ -36,7 +36,7 @@ void CPMReportAirSample(int32_t playerID,int32_t phase,float networkZ,float actu
 }
 
 void CPMReportEntityType(int32_t playerID,bool gameObject,bool playerPuppet,bool npcPuppet){
-    CPM::Logger::Get().Info(std::format("Entidade remota {} | GameObject {} | PlayerPuppet {} | NPCPuppet {}",playerID,gameObject,npcPuppet?false:playerPuppet,npcPuppet));
+    CPM::Logger::Get().Info(std::format("Entidade remota {} | GameObject {} | PlayerPuppet {} | NPCPuppet {}",playerID,gameObject,playerPuppet,npcPuppet));
 }
 
 void CPMReportVisualAction(int32_t playerID,int32_t action,int32_t state){
