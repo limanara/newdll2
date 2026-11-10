@@ -3,6 +3,9 @@
 #include <chrono>
 #include <cstdint>
 #include <format>
+#include <cmath>
+#include <unordered_set>
+#include <cstring>
 #include <iostream>
 #include <unordered_map>
 #include <winsock2.h>
@@ -12,12 +15,21 @@ namespace {
 using Clock=std::chrono::steady_clock;
 std::atomic_bool g_running{true};
 BOOL WINAPI OnConsole(DWORD){g_running=false;return TRUE;}
+constexpr float StreamRadius=180.0f;
+constexpr float StreamRadiusSq=StreamRadius*StreamRadius;
+bool Nearby(const CPM::Protocol::PlayerState& a,const CPM::Protocol::PlayerState& b){
+    const float dx=a.x-b.x,dy=a.y-b.y,dz=a.z-b.z;
+    return dx*dx+dy*dy+dz*dz<=StreamRadiusSq;
+}
+bool Finite(const CPM::Protocol::PlayerState& s){
+    return std::isfinite(s.x)&&std::isfinite(s.y)&&std::isfinite(s.z)&&std::isfinite(s.yaw)&&std::isfinite(s.velocity)&&std::isfinite(s.aimX)&&std::isfinite(s.aimY)&&std::isfinite(s.aimZ);
+}
 std::uint64_t NowMs(){return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now().time_since_epoch()).count();}
 std::uint64_t EndpointKey(const sockaddr_in& value){return (static_cast<std::uint64_t>(value.sin_addr.s_addr)<<16)|ntohs(value.sin_port);}
 std::string Address(const sockaddr_in& value){char ip[INET_ADDRSTRLEN]{};inet_ntop(AF_INET,&value.sin_addr,ip,sizeof(ip));return std::format("{}:{}",ip,ntohs(value.sin_port));}
 struct Session{
     std::uint32_t id{};std::uint64_t token{};sockaddr_in endpoint{};Clock::time_point lastSeen{};bool active{true};bool hasState{false};
-    CPM::Protocol::PlayerState state{};std::uint64_t received{};std::uint64_t relayed{};
+    CPM::Protocol::PlayerState state{};std::uint64_t received{};std::uint64_t relayed{};std::unordered_set<std::uint32_t> visible;
 };
 }
 
@@ -41,7 +53,7 @@ int main(int argc,char** argv){
                 if(it==sessions.end()){Session session{nextId++,hello->nonce,remote,Clock::now(),true,false};it=sessions.emplace(hello->nonce,session).first;std::cout<<"Player "<<it->second.id<<" conectado | sessao "<<std::format("{:016X}",hello->nonce)<<" | "<<Address(remote)<<".\n";}
                 else{endpoints.erase(EndpointKey(it->second.endpoint));it->second.endpoint=remote;it->second.lastSeen=Clock::now();if(!it->second.active)std::cout<<"Player "<<it->second.id<<" reconectado com a mesma sessao.\n";it->second.active=true;}
                 endpoints[endpointKey]=hello->nonce;const auto welcome=CPM::Protocol::Make(CPM::Protocol::Type::Welcome,CPM::Protocol::Welcome{it->second.id});sendto(handle,reinterpret_cast<const char*>(&welcome),sizeof(welcome),0,reinterpret_cast<const sockaddr*>(&remote),sizeof(remote));
-                for(const auto& [token,other]:sessions)if(token!=hello->nonce&&other.active&&other.hasState){const auto state=CPM::Protocol::Make(CPM::Protocol::Type::PlayerState,other.state);sendto(handle,reinterpret_cast<const char*>(&state),sizeof(state),0,reinterpret_cast<const sockaddr*>(&remote),sizeof(remote));}
+
             }else if(header->type==CPM::Protocol::Type::Heartbeat&&header->payloadSize==sizeof(CPM::Protocol::Heartbeat)){
                 const auto* heartbeat=reinterpret_cast<const CPM::Protocol::Heartbeat*>(bytes+sizeof(CPM::Protocol::Header));auto it=sessions.find(heartbeat->sessionToken);
                 if(it!=sessions.end()){
@@ -50,13 +62,49 @@ int main(int argc,char** argv){
                 }
             }else if(header->type==CPM::Protocol::Type::PlayerState&&header->payloadSize==sizeof(CPM::Protocol::PlayerState)){
                 const auto endpoint=endpoints.find(endpointKey);if(endpoint==endpoints.end())continue;auto session=sessions.find(endpoint->second);if(session==sessions.end()||!session->second.active)continue;
-                auto* state=reinterpret_cast<CPM::Protocol::PlayerState*>(bytes+sizeof(CPM::Protocol::Header));state->playerId=session->second.id;session->second.state=*state;session->second.hasState=true;session->second.lastSeen=Clock::now();session->second.received++;
-                for(auto& [token,other]:sessions)if(token!=session->first&&other.active){sendto(handle,bytes,count,0,reinterpret_cast<const sockaddr*>(&other.endpoint),sizeof(other.endpoint));session->second.relayed++;totalRelayed++;}
+                CPM::Protocol::PlayerState incoming{};
+                std::memcpy(&incoming,bytes+sizeof(CPM::Protocol::Header),sizeof(incoming));
+                auto& sender=session->second;
+                if(!Finite(incoming)) {invalidPackets++;continue;}
+                if(sender.hasState && static_cast<std::int32_t>(incoming.sequence-sender.state.sequence)<=0)continue;
+                incoming.playerId=sender.id;
+                sender.state=incoming;sender.hasState=true;sender.lastSeen=Clock::now();sender.received++;
+                const auto packet=CPM::Protocol::Make(CPM::Protocol::Type::PlayerState,incoming);
+                for(auto& [token,other]:sessions){
+                    if(token==session->first||!other.active||!other.hasState)continue;
+                    const bool close=Nearby(incoming,other.state);
+                    const bool previouslyVisible=other.visible.contains(sender.id);
+                    if(close){
+                        sendto(handle,reinterpret_cast<const char*>(&packet),sizeof(packet),0,reinterpret_cast<const sockaddr*>(&other.endpoint),sizeof(other.endpoint));
+                        other.visible.insert(sender.id);sender.relayed++;totalRelayed++;
+                        if(!sender.visible.contains(other.id)){
+                            const auto reciprocal=CPM::Protocol::Make(CPM::Protocol::Type::PlayerState,other.state);
+                            sendto(handle,reinterpret_cast<const char*>(&reciprocal),sizeof(reciprocal),0,reinterpret_cast<const sockaddr*>(&sender.endpoint),sizeof(sender.endpoint));
+                            sender.visible.insert(other.id);
+                        }
+                    }else if(previouslyVisible){
+                        const auto left=CPM::Protocol::Make(CPM::Protocol::Type::PlayerLeft,CPM::Protocol::PlayerLeft{sender.id});
+                        sendto(handle,reinterpret_cast<const char*>(&left),sizeof(left),0,reinterpret_cast<const sockaddr*>(&other.endpoint),sizeof(other.endpoint));
+                        other.visible.erase(sender.id);
+                        if(sender.visible.erase(other.id)){
+                            const auto reciprocal=CPM::Protocol::Make(CPM::Protocol::Type::PlayerLeft,CPM::Protocol::PlayerLeft{other.id});
+                            sendto(handle,reinterpret_cast<const char*>(&reciprocal),sizeof(reciprocal),0,reinterpret_cast<const sockaddr*>(&sender.endpoint),sizeof(sender.endpoint));
+                        }
+                    }
+                }
             }else invalidPackets++;
         }
         const auto now=Clock::now();
         for(auto& [token,session]:sessions)if(session.active&&now-session.lastSeen>std::chrono::seconds(8)){
-            session.active=false;endpoints.erase(EndpointKey(session.endpoint));const auto left=CPM::Protocol::Make(CPM::Protocol::Type::PlayerLeft,CPM::Protocol::PlayerLeft{session.id});for(const auto& [otherToken,other]:sessions)if(otherToken!=token&&other.active)sendto(handle,reinterpret_cast<const char*>(&left),sizeof(left),0,reinterpret_cast<const sockaddr*>(&other.endpoint),sizeof(other.endpoint));std::cout<<"Player "<<session.id<<" ficou inativo (sessao preservada).\n";
+            session.active=false;endpoints.erase(EndpointKey(session.endpoint));
+            const auto left=CPM::Protocol::Make(CPM::Protocol::Type::PlayerLeft,CPM::Protocol::PlayerLeft{session.id});
+            for(auto& [otherToken,other]:sessions){
+                if(otherToken!=token){
+                    if(other.active&&other.visible.contains(session.id))sendto(handle,reinterpret_cast<const char*>(&left),sizeof(left),0,reinterpret_cast<const sockaddr*>(&other.endpoint),sizeof(other.endpoint));
+                    other.visible.erase(session.id);
+                }
+            }
+            session.visible.clear();std::cout<<"Player "<<session.id<<" ficou inativo (sessao preservada).\n";
         }
         if(now-lastStats>=std::chrono::seconds(10)){
             std::size_t active=0;for(const auto& [token,session]:sessions)if(session.active)active++;

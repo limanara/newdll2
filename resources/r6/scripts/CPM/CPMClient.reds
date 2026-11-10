@@ -71,16 +71,8 @@ public class CPMRemoteVisual extends IScriptable {
     public func Initialize(player: ref<PlayerPuppet>, playerID: Int32, slot: Int32) -> Void {
         this.player = player;
         this.playerID = playerID;
-        this.remoteOriginX = CPMRemoteX(playerID);
-        this.remoteOriginY = CPMRemoteY(playerID);
-        this.remoteOriginZ = CPMRemoteZ(playerID);
-        let playerPosition: Vector4 = player.GetWorldPosition();
-        let playerForward: Vector4 = player.GetWorldForward();
-        let playerRight: Vector4 = Vector4(-playerForward.Y, playerForward.X, 0.0, 0.0);
-        let sideOffset: Float = Cast<Float>(slot) * 1.75 - 3.5;
-        let frontOffset: Float = 4.0;
-        this.localAnchor = playerPosition + playerForward * frontOffset + playerRight * sideOffset;
-        this.localAnchor.W = 1.0;
+        // Fase 1: coordenadas globais do mundo, sem ancora artificial no jogador local.
+        this.localAnchor = Vector4(CPMRemoteX(playerID), CPMRemoteY(playerID), CPMRemoteZ(playerID), 1.0);
         this.visualPosition = this.localAnchor;
         this.visualYaw = CPMRemoteYaw(playerID);
         this.locomotionState = -1;
@@ -142,11 +134,10 @@ public class CPMRemoteVisual extends IScriptable {
             CPMReportVisualAction(this.playerID, 1, 1);
         };
         let detailed: Int32 = CPMRemoteDetailedLocomotion(this.playerID);
-        let networkZ: Float = this.localAnchor.Z + CPMRemoteZ(this.playerID) - this.remoteOriginZ;
         let target: Vector4 = Vector4(
-            this.localAnchor.X + CPMRemoteX(this.playerID) - this.remoteOriginX,
-            this.localAnchor.Y + CPMRemoteY(this.playerID) - this.remoteOriginY,
-            networkZ,
+            CPMRemoteX(this.playerID),
+            CPMRemoteY(this.playerID),
+            CPMRemoteZ(this.playerID),
             1.0
         );
         this.UpdateLocomotion(remotePuppet, target);
@@ -289,16 +280,7 @@ public class CPMRemoteVisual extends IScriptable {
             this.airPhase = 1;
             this.airborne = true;
 
-            let impulse: ref<PhysicalImpulseEvent> = new PhysicalImpulseEvent();
-            impulse.radius = 0.50;
-            impulse.worldPosition.X = position.X;
-            impulse.worldPosition.Y = position.Y;
-            impulse.worldPosition.Z = position.Z + 0.80;
-            impulse.worldImpulse.X = CPMRemoteAimX(this.playerID) * 35.0;
-            impulse.worldImpulse.Y = CPMRemoteAimY(this.playerID) * 35.0;
-            impulse.worldImpulse.Z = 450.0;
-            remote.QueueEvent(impulse);
-
+            // Air movement follows network XYZ, not NPC physics impulse.
             AnimationControllerComponent.PushEventToReplicate(remote, n"Jump");
             AnimationControllerComponent.PushEventToReplicate(remote, n"InAir");
             CPMReportVisualAction(this.playerID, 3, 2);
@@ -545,39 +527,57 @@ public class CPMRemoteVisual extends IScriptable {
     }
 
     private func ApplyAirTransform(remote: ref<NPCPuppet>, target: Vector4) -> Void {
-        // Never teleport during flight. The engine owns Z through impulse,
-        // gravity and the character collider; we only observe and diagnose it.
+        // Reproduce remote player's vertical arc directly from network coordinates.
         let actual: Vector4 = remote.GetWorldPosition();
         this.airTicks += 1;
-        if actual.Z > this.airPeakZ { this.airPeakZ = actual.Z; };
-        if this.airPhase == 1 && actual.Z < this.lastAirZ - 0.01 {
+        let dx: Float = target.X - this.visualPosition.X;
+        let dy: Float = target.Y - this.visualPosition.Y;
+        let dz: Float = target.Z - this.visualPosition.Z;
+        if dx * dx + dy * dy + dz * dz > 100.0 {
+            this.visualPosition = target;
+        } else {
+            this.visualPosition.X += dx * 0.45;
+            this.visualPosition.Y += dy * 0.45;
+            this.visualPosition.Z = target.Z;
+            this.visualPosition.W = 1.0;
+        };
+        let yaw: Float = CPMRemoteYaw(this.playerID);
+        let yawDelta: Float = yaw - this.visualYaw;
+        if yawDelta > 180.0 { yawDelta -= 360.0; }
+        else { if yawDelta < -180.0 { yawDelta += 360.0; }; };
+        this.visualYaw += yawDelta * 0.30;
+        let angles: EulerAngles;
+        angles.Pitch = 0.0;
+        angles.Roll = 0.0;
+        angles.Yaw = this.visualYaw;
+        GameInstance.GetTeleportationFacility(this.player.GetGame()).Teleport(remote, this.visualPosition, angles);
+        if target.Z > this.airPeakZ { this.airPeakZ = target.Z; };
+        if this.airPhase == 1 && target.Z < this.lastAirZ - 0.015 {
             this.airPhase = 2;
             AnimationControllerComponent.PushEventToReplicate(remote, n"Fall");
             CPMReportVisualAction(this.playerID, 4, 2);
         };
-        this.visualPosition = actual;
-        this.visualPosition.W = 1.0;
         if this.airTicks % 5 == 0 {
-            CPMReportAirSample(this.playerID, this.airPhase, CPMRemoteZ(this.playerID), actual.Z, this.airStartZ, this.airPeakZ);
+            CPMReportAirSample(this.playerID, this.airPhase, target.Z, actual.Z, this.airStartZ, this.airPeakZ);
         };
-        let grounded: Bool = actual.Z <= this.airStartZ + 0.12 && this.airTicks > 5;
-        if this.airPhase == 3 && (grounded || this.airTicks >= 60) {
-            let landingFeature: ref<AnimFeature_Landing> = new AnimFeature_Landing();
-            landingFeature.type = 1;
-            landingFeature.impactSpeed = -7.0;
-            AnimationControllerComponent.ApplyFeature(remote, n"Landing", landingFeature);
+        let detailed: Int32 = CPMRemoteDetailedLocomotion(this.playerID);
+        let landing: Bool = detailed >= 23 && detailed <= 27;
+        let jumping: Bool = detailed == 18 || detailed == 19 || detailed == 20 || detailed == 21;
+        let falling: Bool = detailed == 14;
+        let nearGround: Bool = target.Z <= this.airStartZ + 0.12;
+        if landing || (!jumping && !falling && nearGround && this.airTicks > 5) || this.airTicks >= 100 {
+            let feature: ref<AnimFeature_Landing> = new AnimFeature_Landing();
+            feature.type = 1;
+            feature.impactSpeed = -7.0;
+            AnimationControllerComponent.ApplyFeature(remote, n"Landing", feature);
             AnimationControllerComponent.PushEventToReplicate(remote, n"Land");
             AnimationControllerComponent.PushEventToReplicate(remote, n"Landing");
             this.ForceStanding(remote);
             this.airborne = false;
             this.airPhase = 0;
-            if grounded {
-                CPMReportVisualAction(this.playerID, 5, 5);
-            } else {
-                CPMReportVisualAction(this.playerID, 5, 6);
-            };
+            CPMReportVisualAction(this.playerID, 5, 5);
         };
-        this.lastAirZ = actual.Z;
+        this.lastAirZ = target.Z;
         remote.GetAIControllerComponent().ForceTickNextFrame();
     }
 
