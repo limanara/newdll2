@@ -70,7 +70,8 @@ jobs:
             "install-client.bat",
             "README.md",
             "FASE1-RP.md",
-            "CORRECAO-PULO.md"
+            "CORRECAO-PULO.md",
+            "TESTE-NPC-AUTOMATICO.md"
           )
 
           foreach ($file in $optionalFiles) {
