@@ -25,6 +25,25 @@ function Send-State($player,[uint32]$sequence,[single]$x,[single]$y,[single]$z,[
 }
 
 $udp=[System.Net.Sockets.UdpClient]::new();$udp.Connect("127.0.0.1",11777);$udp.Client.ReceiveTimeout=3000
+# Consulta local ao servidor: pacote 7 sem payload; resposta 8 com X/Y/Z/Yaw.
+$query=New-CPMPacket 7 0
+[void]$udp.Send($query.ToArray(),$query.Count)
+try { $positionReply=$udp.Receive([ref]([System.Net.IPEndPoint]::new([System.Net.IPAddress]::Any,0))) }
+catch { $udp.Dispose();throw "Posicao indisponivel. Entre no jogo e aguarde o cliente enviar PlayerState antes de iniciar o teste." }
+if($positionReply.Length -ne 28 -or [BitConverter]::ToUInt16($positionReply,6) -ne 8){$udp.Dispose();throw "Resposta de posicao invalida. Recompile e substitua CPMServer.exe."}
+[single]$originX=[BitConverter]::ToSingle($positionReply,12)
+[single]$originY=[BitConverter]::ToSingle($positionReply,16)
+[single]$originZ=[BitConverter]::ToSingle($positionReply,20)
+[single]$originYaw=[BitConverter]::ToSingle($positionReply,24)
+# Direcao conforme o yaw enviado pelo cliente. Offset inicial de 3 metros.
+[double]$heading=$originYaw*[Math]::PI/180.0
+[single]$forwardX=[Math]::Cos($heading)
+[single]$forwardY=[Math]::Sin($heading)
+[single]$baseX=$originX+3*$forwardX
+[single]$baseY=$originY+3*$forwardY
+Write-Host "Jogador: X=$originX Y=$originY Z=$originZ yaw=$originYaw" -ForegroundColor Cyan
+Write-Host "NPC: X=$baseX Y=$baseY Z=$originZ (inicio a 3m)" -ForegroundColor Green
+
 [uint64]$token=(([uint64](Get-Random -Minimum 1 -Maximum 2147483647))-shl 32)-bor([uint64](Get-Random -Minimum 1 -Maximum 2147483647))
 $hello=New-CPMPacket 1 8;$hello.AddRange([BitConverter]::GetBytes($token));[void]$udp.Send($hello.ToArray(),$hello.Count)
 $endpoint=[System.Net.IPEndPoint]::new([System.Net.IPAddress]::Any,0);$welcome=$udp.Receive([ref]$endpoint)
@@ -57,7 +76,12 @@ for([uint32]$seq=0; $seq -lt 1210; $seq++){
     elseif($seq -lt 1150){$phase="ATAQUE CORPO A CORPO";$x=2.2;$yaw=180;$flags=0;$upper=0;$weaponState=0;$meleeState=11;if($seq -eq 1030 -or $seq -eq 1090){$melee++}}
     else{$phase="FINAL PARADO";$x=2.2;$yaw=180;$flags=0;$detail=1}
     if($phase -ne $lastPhase){Write-Host "`nFASE: $phase | Seq $seq" -ForegroundColor Yellow;$lastPhase=$phase}
-    Send-State $player $seq $x $y $z $yaw $speed $loc $detail $upper $weaponState $meleeState $weaponType $flags $shot $reload $melee
+    # Trajetoria local do teste -> coordenadas globais proximas ao jogador.
+    [single]$worldX=$baseX+$x*$forwardX-$y*$forwardY
+    [single]$worldY=$baseY+$x*$forwardY+$y*$forwardX
+    [single]$worldZ=$originZ+$z
+    [single]$worldYaw=($originYaw+$yaw)%360
+    Send-State $player $seq $worldX $worldY $worldZ $worldYaw $speed $loc $detail $upper $weaponState $meleeState $weaponType $flags $shot $reload $melee
     Start-Sleep -Milliseconds 50
 }
 $udp.Dispose();Write-Host "Teste 0.3.0.0 finalizado. Todas as fases foram enviadas; o NPC desaparecera apos o timeout." -ForegroundColor Green

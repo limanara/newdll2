@@ -54,6 +54,20 @@ int main(int argc,char** argv){
                 else{endpoints.erase(EndpointKey(it->second.endpoint));it->second.endpoint=remote;it->second.lastSeen=Clock::now();if(!it->second.active)std::cout<<"Player "<<it->second.id<<" reconectado com a mesma sessao.\n";it->second.active=true;}
                 endpoints[endpointKey]=hello->nonce;const auto welcome=CPM::Protocol::Make(CPM::Protocol::Type::Welcome,CPM::Protocol::Welcome{it->second.id});sendto(handle,reinterpret_cast<const char*>(&welcome),sizeof(welcome),0,reinterpret_cast<const sockaddr*>(&remote),sizeof(remote));
 
+            }else if(header->type==static_cast<CPM::Protocol::Type>(7)&&header->payloadSize==0){
+                // Consulta de teste SOMENTE local: nunca exponha coordenadas pela rede.
+                if(ntohl(remote.sin_addr.s_addr)!=INADDR_LOOPBACK){invalidPackets++;continue;}
+                const Session* target=nullptr;
+                for(const auto& [token,candidate]:sessions){
+                    if(!candidate.active||!candidate.hasState)continue;
+                    if(!target||candidate.lastSeen>target->lastSeen)target=&candidate;
+                }
+                if(target){
+                    struct TestPosition{float x,y,z,yaw;};
+                    const TestPosition pos{target->state.x,target->state.y,target->state.z,target->state.yaw};
+                    const auto reply=CPM::Protocol::Make(static_cast<CPM::Protocol::Type>(8),pos);
+                    sendto(handle,reinterpret_cast<const char*>(&reply),sizeof(reply),0,reinterpret_cast<const sockaddr*>(&remote),sizeof(remote));
+                }
             }else if(header->type==CPM::Protocol::Type::Heartbeat&&header->payloadSize==sizeof(CPM::Protocol::Heartbeat)){
                 const auto* heartbeat=reinterpret_cast<const CPM::Protocol::Heartbeat*>(bytes+sizeof(CPM::Protocol::Header));auto it=sessions.find(heartbeat->sessionToken);
                 if(it!=sessions.end()){

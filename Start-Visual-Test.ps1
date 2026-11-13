@@ -10,10 +10,17 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host " CPM 0.3.0.0 - PHYSICAL AIR DRIVER + DIAGNOSTICS" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
-$serverProcess = Start-Process -FilePath $server -WorkingDirectory $root -PassThru
+# Evita abrir um segundo servidor quando a porta ja esta em uso.
+$existing = Get-NetUDPEndpoint -LocalPort 11777 -ErrorAction SilentlyContinue
+if (!$existing) {
+    $serverProcess = Start-Process -FilePath $server -WorkingDirectory $root -PassThru
+    Start-Sleep -Seconds 2
+} else {
+    Write-Host "Servidor UDP 11777 ja esta ativo; reutilizando." -ForegroundColor Green
+}
 Write-Host "Servidor iniciado. Abra o Cyberpunk e carregue um save de teste." -ForegroundColor Yellow
 Write-Host "Pode permanecer em qualquer local seguro do mapa." -ForegroundColor Yellow
-Write-Host "Um NPC sera criado a sua frente." -ForegroundColor Yellow
+Write-Host "O simulador consultara sua posicao automaticamente no servidor." -ForegroundColor Yellow
 Write-Host "O teste cobre locomocao, salto, agachamento, mira, tiro, recarga e melee." -ForegroundColor Yellow
 Read-Host "Quando estiver dentro do jogo, pressione ENTER"
 
