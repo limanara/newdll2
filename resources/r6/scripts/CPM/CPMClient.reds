@@ -67,6 +67,7 @@ public class CPMRemoteVisual extends IScriptable {
     private let airStartZ: Float;
     private let airPeakZ: Float;
     private let lastAirZ: Float;
+    private let airActualPeakZ: Float;
 
     public func Initialize(player: ref<PlayerPuppet>, playerID: Int32, slot: Int32) -> Void {
         this.player = player;
@@ -127,8 +128,7 @@ public class CPMRemoteVisual extends IScriptable {
         let remotePuppet: ref<NPCPuppet> = remote as NPCPuppet;
         if !IsDefined(remoteObject) || !IsDefined(remotePuppet) { return; };
         if !this.controllerPrepared {
-            // 0.3.0.0: keep the character controller/collider active so the
-            // engine can process a real PhysicalImpulseEvent and gravity.
+            // Ground movement uses the normal NPC character controller.
             remotePuppet.GetAIControllerComponent().ForceTickNextFrame();
             this.controllerPrepared = true;
             CPMReportVisualAction(this.playerID, 1, 1);
@@ -269,23 +269,35 @@ public class CPMRemoteVisual extends IScriptable {
         let jumping: Bool = detailed == 18 || detailed == 19 || detailed == 20 || detailed == 21;
         let falling: Bool = detailed == 14;
         let landing: Bool = detailed >= 23 && detailed <= 27;
+        let enteringAir: Bool = (jumping || falling) && !this.airborne;
 
-        if jumping && !this.airborne {
+        if enteringAir {
             this.ForceStanding(remote);
             this.StopLocomotion(remote);
             let position: Vector4 = remote.GetWorldPosition();
             this.airStartZ = position.Z;
             this.airPeakZ = position.Z;
+            this.airActualPeakZ = position.Z;
             this.lastAirZ = position.Z;
             this.airTicks = 0;
             this.airPhase = 1;
             this.airborne = true;
 
-            // Air movement follows network XYZ, not NPC physics impulse.
-            AnimationControllerComponent.PushEventToReplicate(remote, n"Jump");
+            // The remote trajectory is authoritative. Temporarily release the
+            // NPC collider so it cannot pin teleports to ground/navigation Z.
+            remote.GetAIControllerComponent().DisableCollider();
+            this.SetAirAnimation(remote, true);
             AnimationControllerComponent.PushEventToReplicate(remote, n"InAir");
-            CPMReportVisualAction(this.playerID, 3, 2);
+            if jumping {
+                AnimationControllerComponent.PushEventToReplicate(remote, n"Jump");
+                CPMReportVisualAction(this.playerID, 3, 2);
+            };
             CPMReportAirSample(this.playerID, this.airPhase, CPMRemoteZ(this.playerID), position.Z, this.airStartZ, this.airPeakZ);
+        };
+
+        if jumping && this.airborne && !enteringAir {
+            AnimationControllerComponent.PushEventToReplicate(remote, n"Jump");
+            this.airPhase = 1;
         };
 
         if falling && this.airborne {
@@ -300,6 +312,14 @@ public class CPMRemoteVisual extends IScriptable {
             CPMReportVisualAction(this.playerID, 5, 1);
         };
         this.lastDetailedLocomotion = detailed;
+    }
+
+    private func SetAirAnimation(remote: ref<NPCPuppet>, inAir: Bool) -> Void {
+        // Same parameter used by LocomotionAirEvents in the player scripts.
+        // An NPC graph still needs a compatible branch/animation set.
+        let feature: ref<AnimFeature_PlayerLocomotionStateMachine> = new AnimFeature_PlayerLocomotionStateMachine();
+        feature.inAirState = inAir;
+        AnimationControllerComponent.ApplyFeature(remote, n"LocomotionStateMachine", feature);
     }
 
     private func ForceStanding(remote: ref<NPCPuppet>) -> Void {
@@ -536,6 +556,7 @@ public class CPMRemoteVisual extends IScriptable {
     private func ApplyAirTransform(remote: ref<NPCPuppet>, target: Vector4) -> Void {
         // Reproduce remote player's vertical arc directly from network coordinates.
         let actual: Vector4 = remote.GetWorldPosition();
+        if actual.Z > this.airActualPeakZ { this.airActualPeakZ = actual.Z; };
         // Report the PREVIOUS frame's result, before issuing this frame's teleport.
         // If actual.Z remains grounded here, the engine is restoring ground height.
         this.airTicks += 1;
@@ -580,17 +601,30 @@ public class CPMRemoteVisual extends IScriptable {
         let jumping: Bool = detailed == 18 || detailed == 19 || detailed == 20 || detailed == 21;
         let falling: Bool = detailed == 14;
         let nearGround: Bool = target.Z <= this.airStartZ + 0.12;
-        if landing || (!jumping && !falling && nearGround && this.airTicks > 5) || this.airTicks >= 100 {
+        // A landing state alone is insufficient: wait for its network position
+        // to settle, including landings on a platform above the takeoff point.
+        let settledLanding: Bool = landing && AbsF(target.Z - this.lastAirZ) < 0.05 && this.airTicks > 5;
+        if settledLanding || (!jumping && !falling && nearGround && this.airTicks > 5) || this.airTicks >= 100 {
             let feature: ref<AnimFeature_Landing> = new AnimFeature_Landing();
             feature.type = 1;
             feature.impactSpeed = -7.0;
             AnimationControllerComponent.ApplyFeature(remote, n"Landing", feature);
             AnimationControllerComponent.PushEventToReplicate(remote, n"Land");
             AnimationControllerComponent.PushEventToReplicate(remote, n"Landing");
+            this.SetAirAnimation(remote, false);
+            remote.GetAIControllerComponent().EnableCollider();
             this.ForceStanding(remote);
+            this.visualPosition = remote.GetWorldPosition();
             this.airborne = false;
             this.airPhase = 0;
-            CPMReportVisualAction(this.playerID, 5, 5);
+            // State 5 means measured visual movement; 6 is timeout; -2 means
+            // the jump request ended without measurable upward displacement.
+            if this.airTicks >= 100 { CPMReportVisualAction(this.playerID, 5, 6); }
+            else {
+                if this.airActualPeakZ > this.airStartZ + 0.10 || this.airPeakZ <= this.airStartZ + 0.10 {
+                    CPMReportVisualAction(this.playerID, 5, 5);
+                } else { CPMReportVisualAction(this.playerID, 5, -2); };
+            };
         };
         this.lastAirZ = target.Z;
         // Do not force an extra AI tick during the jump: it can restore the
@@ -673,7 +707,7 @@ public class CPMTelemetryCallback extends DelayCallback {
             let locomotion: Int32 = blackboard.GetInt(GetAllBlackboardDefs().PlayerStateMachine.Locomotion);
             let detailedLocomotion: Int32 = blackboard.GetInt(GetAllBlackboardDefs().PlayerStateMachine.LocomotionDetailed);
             let upperBody: Int32 = blackboard.GetInt(GetAllBlackboardDefs().PlayerStateMachine.UpperBody);
-            let weaponState: Int32 = blackboard.GetInt(GetAllBlackboardDefs().PlayerStateMachine.Weapon);
+            let weaponState: Int32 = blackboard.GetInt(GetAllBlackboardDefs().PlayerStateMachine.RightWeapon);
             let meleeState: Int32 = blackboard.GetInt(GetAllBlackboardDefs().PlayerStateMachine.MeleeWeapon);
             let activeWeapon: ref<WeaponObject> = GameObject.GetActiveWeapon(this.player);
             let weaponType: Int32 = -1;

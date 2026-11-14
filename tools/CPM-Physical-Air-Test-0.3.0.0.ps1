@@ -1,3 +1,4 @@
+param([switch]$AirOnly, [ValidateRange(1,65535)][int]$Port = 11777)
 $ErrorActionPreference = "Stop"
 
 function New-CPMPacket([uint16]$type, [uint32]$size) {
@@ -24,7 +25,7 @@ function Send-State($player,[uint32]$sequence,[single]$x,[single]$y,[single]$z,[
     [void]$player.Udp.Send($packet.ToArray(),$packet.Count)
 }
 
-$udp=[System.Net.Sockets.UdpClient]::new();$udp.Connect("127.0.0.1",11777);$udp.Client.ReceiveTimeout=3000
+$udp=[System.Net.Sockets.UdpClient]::new();$udp.Connect("127.0.0.1",$Port);$udp.Client.ReceiveTimeout=3000
 # Consulta local ao servidor: pacote 7 sem payload; resposta 8 com X/Y/Z/Yaw.
 $query=New-CPMPacket 7 0
 [void]$udp.Send($query.ToArray(),$query.Count)
@@ -50,15 +51,25 @@ $endpoint=[System.Net.IPEndPoint]::new([System.Net.IPAddress]::Any,0);$welcome=$
 if($welcome.Length-ne 16-or[BitConverter]::ToUInt16($welcome,6)-ne 2){throw "Handshake CPM 0.3.0.0 falhou."}
 $player=[pscustomobject]@{Udp=$udp;Token=$token;Id=[BitConverter]::ToUInt32($welcome,12);Clock=[Diagnostics.Stopwatch]::StartNew()}
 
-Write-Host "CPM 0.3.0.0: Physical Air Driver + Diagnostics iniciado." -ForegroundColor Green
+Write-Host "CPM: teste experimental de trajetoria aerea iniciado." -ForegroundColor Green
 Write-Host "O NPC volta para perto antes de testar mira, tiro, recarga e melee." -ForegroundColor Cyan
 [uint32]$shot=0;[uint32]$reload=0;[uint32]$melee=0;$lastPhase=""
 
-for([uint32]$seq=0; $seq -lt 1210; $seq++){
+$sampleCount = if ($AirOnly) { 160 } else { 1210 }
+for([uint32]$seq=0; $seq -lt $sampleCount; $seq++){
     if(($seq%20) -eq 0){$heartbeat=New-CPMPacket 5 20;$heartbeat.AddRange([BitConverter]::GetBytes([uint32]$player.Id));$heartbeat.AddRange([BitConverter]::GetBytes([uint64]$player.Token));$heartbeat.AddRange([BitConverter]::GetBytes([uint64]$player.Clock.ElapsedMilliseconds));[void]$udp.Send($heartbeat.ToArray(),$heartbeat.Count)}
     [single]$x=0;[single]$y=0;[single]$z=0;[single]$yaw=0;[single]$speed=0
     [int16]$loc=0;[int16]$detail=1;[int16]$upper=0;[int16]$weaponState=0;[int16]$meleeState=22;[int16]$weaponType=2;[uint16]$flags=0
-    if($seq -lt 80){$phase="PARADO";$x=0}
+    if($AirOnly){
+        # Two jumps at 3m from the observer, with no combat or long walk first.
+        $tick = $seq % 80
+        if($tick -lt 20){$phase="PARADO ANTES DO SALTO"}
+        elseif($tick -lt 35){$phase="SALTO";[single]$t=($tick-20)/15.0;$z=1.15*(2.0*$t-$t*$t);$detail=18}
+        elseif($tick -lt 50){$phase="QUEDA";[single]$u=($tick-35)/15.0;$z=1.15*(1.0-$u*$u);$detail=14}
+        elseif($tick -lt 60){$phase="ATERRISSAGEM";$detail=23}
+        else{$phase="PARADO APOS SALTO"}
+    }
+    elseif($seq -lt 80){$phase="PARADO";$x=0}
     elseif($seq -lt 220){$phase="CAMINHADA";$x=($seq-80)*0.06;$speed=2.0}
     elseif($seq -lt 340){$phase="CORRIDA";$x=8.4+($seq-220)*0.12;$speed=5.5;$loc=2;$detail=4}
     elseif($seq -lt 440){$phase="AGACHADO";$x=22.8+($seq-340)*0.03;$speed=1.2;$loc=1;$detail=3}

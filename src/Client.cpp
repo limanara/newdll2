@@ -94,6 +94,8 @@ void Client::HandlePacket(const char* data,int bytes){
     }else if(header->type==Protocol::Type::PlayerState&&header->payloadSize==sizeof(Protocol::PlayerState)){
         const auto* state=reinterpret_cast<const Protocol::PlayerState*>(data+sizeof(Protocol::Header));if(state->playerId==playerId_.load())return;
         std::scoped_lock lock(remotesMutex_);auto& remote=remotes_[state->playerId];
+        // UDP can arrive out of order. Never rewind the visual state machine.
+        if(remote.receivedPackets>0&&static_cast<std::int32_t>(state->sequence-remote.lastSequence)<=0)return;
         if(remote.receivedPackets>0&&state->sequence>remote.lastSequence+1)remote.lostPackets+=state->sequence-remote.lastSequence-1;
         const auto old=remote.state;
         if(remote.receivedPackets>0){

@@ -1,7 +1,5 @@
-# Correcao experimental do pulo remoto
+# Patch experimental do salto
 
-O NPCPuppet pode ignorar PhysicalImpulseEvent. A rotina aerea agora usa Z de rede e suaviza X/Y.
-
-Substitua o REDscript em `resources/r6/scripts/CPM/CPMClient.reds` na instalacao cliente, e reinicie o jogo para recompilar os scripts.
-
-Testes pendentes: pulo parado, correndo, duplo, queda de altura e aterrissagem. Nao foi compilado ou testado no Cyberpunk 2077. A tecnica usa teleporte por frame durante o ar e pode apresentar jitter ou problemas de animacao dependendo do NPCPuppet.
+Consulte REVISAO-SALTO.md para evidencia, instalacao, verificacoes e limites.
+O driver usa coordenadas de rede e libera o collider durante o ar.
+Nao usa PhysicalImpulseEvent. Animacao e movimento ainda exigem teste no jogo.

@@ -1,0 +1,34 @@
+[INFO - Sat, 14 Nov 2026 09:06:19 -0300] Compiling files in C:\Users\ll209\Downloads\newdll2-main\resources\r6\scripts:
+CPM\CPMClient.reds
+CPM\CPMClient.reds
+D:\SteamLibrary\steamapps\common\Cyberpunk 2077\red4ext\plugins\Codeware\Scripts\Codeware.Global.reds
+D:\SteamLibrary\steamapps\common\Cyberpunk 2077\red4ext\plugins\Codeware\Scripts\Codeware.Localization.reds
+D:\SteamLibrary\steamapps\common\Cyberpunk 2077\red4ext\plugins\Codeware\Scripts\Codeware.reds
+D:\SteamLibrary\steamapps\common\Cyberpunk 2077\red4ext\plugins\Codeware\Scripts\Codeware.UI.reds
+D:\SteamLibrary\steamapps\common\Cyberpunk 2077\red4ext\plugins\Codeware\Scripts\Codeware.UI.TextInput.reds
+[WARN - Sat, 14 Nov 2026 09:06:20 -0300] At C:\Users\ll209\Downloads\newdll2-main\resources\r6\scripts\CPM\CPMClient.reds:762:1:
+@addField(PlayerPuppet)
+^^^
+a field with this name is already defined in the class, this will have no effect
+
+[ERROR - Sat, 14 Nov 2026 09:06:20 -0300] [SYM_REDEFINITION] At C:\Users\ll209\Downloads\newdll2-main\resources\r6\scripts\CPM\CPMClient.reds:30:1:
+public class CPMRemoteVisual extends IScriptable {
+^^^
+the name of this type conflicts with a type defined at 'C:\Users\ll209\Downloads\newdll2-main\resources\r6\scripts\CPM\CPMClient.reds:30:1'
+
+[ERROR - Sat, 14 Nov 2026 09:06:20 -0300] [SYM_REDEFINITION] At C:\Users\ll209\Downloads\newdll2-main\resources\r6\scripts\CPM\CPMClient.reds:696:1:
+public class CPMTelemetryCallback extends DelayCallback {
+^^^
+the name of this type conflicts with a type defined at 'C:\Users\ll209\Downloads\newdll2-main\resources\r6\scripts\CPM\CPMClient.reds:696:1'
+
+[ERROR - Sat, 14 Nov 2026 09:06:20 -0300] [UNRESOLVED_MEMBER] At C:\Users\ll209\Downloads\newdll2-main\resources\r6\scripts\CPM\CPMClient.reds:710:56:
+            let weaponState: Int32 = blackboard.GetInt(GetAllBlackboardDefs().PlayerStateMachine.Weapon);
+                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+member 'Weapon' not found on 'PlayerStateMachineDef'
+
+[ERROR - Sat, 14 Nov 2026 09:06:43 -0300] REDScript compilation has failed.
+This error has been caused by mods listed below:
+- CPM
+
+You should check if these mods are outdated and update them if possible. They may also be incompatible with the current version of the game, in which case you should remove them and try again.
+

@@ -1,3 +1,4 @@
+param([switch]$AirOnly)
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $server = Join-Path $root "CPMServer.exe"
@@ -7,13 +8,13 @@ if (!(Test-Path $server)) { throw "CPMServer.exe nao encontrado em $root" }
 if (!(Test-Path $simulator)) { throw "Teste visual nao encontrado em $simulator" }
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host " CPM 0.3.0.0 - PHYSICAL AIR DRIVER + DIAGNOSTICS" -ForegroundColor Cyan
+Write-Host " CPM - TESTE EXPERIMENTAL DE SALTO REMOTO" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
 # Evita abrir um segundo servidor quando a porta ja esta em uso.
 $existing = Get-NetUDPEndpoint -LocalPort 11777 -ErrorAction SilentlyContinue
 if (!$existing) {
-    $serverProcess = Start-Process -FilePath $server -WorkingDirectory $root -PassThru
+    $serverProcess = Start-Process -FilePath $server -WorkingDirectory $root -WindowStyle Hidden -PassThru
     Start-Sleep -Seconds 2
 } else {
     Write-Host "Servidor UDP 11777 ja esta ativo; reutilizando." -ForegroundColor Green
@@ -24,7 +25,8 @@ Write-Host "O simulador consultara sua posicao automaticamente no servidor." -Fo
 Write-Host "O teste cobre locomocao, salto, agachamento, mira, tiro, recarga e melee." -ForegroundColor Yellow
 Read-Host "Quando estiver dentro do jogo, pressione ENTER"
 
-& powershell -ExecutionPolicy Bypass -File $simulator
+if ($AirOnly) { & powershell -ExecutionPolicy Bypass -File $simulator -AirOnly }
+else { & powershell -ExecutionPolicy Bypass -File $simulator }
 
 Write-Host ""
 Write-Host "Teste visual concluido. O servidor continua aberto." -ForegroundColor Green

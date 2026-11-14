@@ -1,25 +1,32 @@
-# CPM 0.3.0.0 — Physical Air Driver + Diagnostics
+# CPM — prototipo multiplayer para Cyberpunk 2077
 
-A versão 0.2.0.2 permanece como base aprovada para locomoção terrestre, arma, recarga, holster e melee.
+Cliente RED4ext + REDscript/Codeware e servidor UDP C++ (protocolo v2).
+O remoto e um NPCPuppet, nao um PlayerPuppet. Lua ainda nao esta integrado.
 
-## Mudança estrutural
+## Revisao do salto — 14/11/2026
 
-- O collider do puppet remoto permanece ativo.
-- O início do salto envia um `PhysicalImpulseEvent` vertical apenas uma vez.
-- Nenhum teleporte é executado durante a fase aérea.
-- A gravidade e o character controller do jogo passam a controlar a trajetória.
-- A posição Z real da entidade é medida durante todo o salto.
-- A aterrissagem só finaliza quando há proximidade com o Z inicial ou timeout de segurança.
-- Logs comparam Z recebido da rede, Z real, início, pico e altura atingida.
+O codigo recebido usava teleporte, apesar do nome Physical Air Driver.
+O patch libera temporariamente o collider e aplica o parametro de animacao
+aerea usado pelo jogador. Veja REVISAO-SALTO.md para diagnostico e limites.
 
-## Artifact
+Status: REDscript compilado; simulador validado com UDP isolado. Movimento e
+animacao ainda precisam de teste no jogo. O grafo do NPC Animals pode nao
+conter a animacao de salto de V. Nao ha garantia de reproduzir Space so com scripts.
 
-`CPM-Windows-0.3.0.0-Physical-Air-Driver-Diagnostics`
-
-## Execução
+Teste curto (CPMServer.exe precisa estar na raiz do pacote):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\Start-Visual-Test.ps1"
+powershell -ExecutionPolicy Bypass -File .\Start-Visual-Test.ps1 -AirOnly
 ```
 
-Esta é uma versão experimental do novo controlador aéreo. Se o puppet ignorar o impulso, o log demonstrará isso objetivamente e a próxima etapa será substituir o archetype NPC por uma entidade TPP com move component próprio.
+Dois saltos parados a 3 metros. Sem -AirOnly, executa o teste completo.
+
+Verificacao do simulador sem jogo:
+
+```powershell
+python tools/test_air_simulator.py
+```
+
+Compilacao C++: build-windows.bat com MSVC/CMake ou workflow GitHub Actions.
+O REDscript corrigido funciona com as assinaturas nativas da DLL 0.3.0.0.
+Recompile a DLL para incluir tambem o descarte de pacotes fora de ordem.
