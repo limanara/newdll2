@@ -8,3 +8,6 @@ O servidor atende a consulta UDP tipo 7 **somente em 127.0.0.1**, retornando tip
 4. Evite ruas com desnivel/obstaculos: o simulador percorre ~30 unidades e usa o Z inicial como solo.
 
 **Limitacoes:** o teste usa o jogador com estado mais recente, nao necessariamente o mais proximo; sem estado do cliente o teste falha com mensagem. O yaw deve seguir a convencao do cliente; caso o NPC apareca em direcao errada, ajuste a transformacao. Nao ha validacao de compilacao Windows neste ambiente.
+
+
+Ver REVISAO-SALTO.md para o diagnostico da sincronizacao aerea.

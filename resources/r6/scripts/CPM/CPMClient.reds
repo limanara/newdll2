@@ -140,8 +140,9 @@ public class CPMRemoteVisual extends IScriptable {
             CPMRemoteZ(this.playerID),
             1.0
         );
-        this.UpdateLocomotion(remotePuppet, target);
+        // Resolve air state first: locomotion must not start a ground AI command in mid-air.
         this.UpdateNetworkStates(remotePuppet);
+        this.UpdateLocomotion(remotePuppet, target);
         if this.airborne { this.ApplyAirTransform(remotePuppet, target); }
         else { this.InterpolateTransform(remoteObject, target); };
         this.ReportCommandStates(remotePuppet);
@@ -471,8 +472,14 @@ public class CPMRemoteVisual extends IScriptable {
             this.locomotionCandidateTicks = 0;
             return;
         };
-        if airAction {
-            requestedState = 1;
+        if airAction || this.airborne {
+            // Ground AIMoveToCommand can pin the NPC to navigation height and
+            // fight the network-driven vertical arc.
+            this.StopLocomotion(remote);
+            this.locomotionState = 0;
+            this.locomotionCandidate = 0;
+            this.locomotionCandidateTicks = 0;
+            return;
         } else {
             if networkLocomotion == 1 || detailed == 3 || detailed == 30 { requestedState = 3; }
             else { if networkLocomotion == 2 || networkLocomotion == 11 || detailed == 4 { requestedState = 2; }
@@ -529,6 +536,8 @@ public class CPMRemoteVisual extends IScriptable {
     private func ApplyAirTransform(remote: ref<NPCPuppet>, target: Vector4) -> Void {
         // Reproduce remote player's vertical arc directly from network coordinates.
         let actual: Vector4 = remote.GetWorldPosition();
+        // Report the PREVIOUS frame's result, before issuing this frame's teleport.
+        // If actual.Z remains grounded here, the engine is restoring ground height.
         this.airTicks += 1;
         let dx: Float = target.X - this.visualPosition.X;
         let dy: Float = target.Y - this.visualPosition.Y;
@@ -551,6 +560,12 @@ public class CPMRemoteVisual extends IScriptable {
         angles.Roll = 0.0;
         angles.Yaw = this.visualYaw;
         GameInstance.GetTeleportationFacility(this.player.GetGame()).Teleport(remote, this.visualPosition, angles);
+        // A second sample checks whether the teleport takes effect immediately.
+        // The existing periodic sample above checks whether it survives a frame.
+        if this.airTicks % 5 == 0 {
+            let afterTeleport: Vector4 = remote.GetWorldPosition();
+            CPMReportAirSample(this.playerID, 10 + this.airPhase, target.Z, afterTeleport.Z, this.airStartZ, this.airPeakZ);
+        };
         if target.Z > this.airPeakZ { this.airPeakZ = target.Z; };
         if this.airPhase == 1 && target.Z < this.lastAirZ - 0.015 {
             this.airPhase = 2;
@@ -578,7 +593,8 @@ public class CPMRemoteVisual extends IScriptable {
             CPMReportVisualAction(this.playerID, 5, 5);
         };
         this.lastAirZ = target.Z;
-        remote.GetAIControllerComponent().ForceTickNextFrame();
+        // Do not force an extra AI tick during the jump: it can restore the
+        // NPC to navigation/ground height immediately after the teleport.
     }
 
     private func MoveIntoMeleeRange(remote: ref<NPCPuppet>) -> Void {
