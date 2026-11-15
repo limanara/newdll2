@@ -588,10 +588,11 @@ public class CPMRemoteVisual extends IScriptable {
             CPMReportAirSample(this.playerID, 10 + this.airPhase, target.Z, afterTeleport.Z, this.airStartZ, this.airPeakZ);
         };
         if target.Z > this.airPeakZ { this.airPeakZ = target.Z; };
-        if this.airPhase == 1 && target.Z < this.lastAirZ - 0.015 {
+        // Do not infer falling from interpolation jitter while the sender is
+        // explicitly reporting a jump. The network locomotion transition to
+        // detail 14 is handled once in UpdateAirState().
+        if this.airPhase == 1 && CPMRemoteDetailedLocomotion(this.playerID) == 14 {
             this.airPhase = 2;
-            AnimationControllerComponent.PushEventToReplicate(remote, n"Fall");
-            CPMReportVisualAction(this.playerID, 4, 2);
         };
         if this.airTicks % 5 == 0 {
             CPMReportAirSample(this.playerID, this.airPhase, target.Z, actual.Z, this.airStartZ, this.airPeakZ);
@@ -612,6 +613,7 @@ public class CPMRemoteVisual extends IScriptable {
             AnimationControllerComponent.PushEventToReplicate(remote, n"Land");
             AnimationControllerComponent.PushEventToReplicate(remote, n"Landing");
             this.SetAirAnimation(remote, false);
+            AnimationControllerComponent.PushEventToReplicate(remote, n"Idle");
             remote.GetAIControllerComponent().EnableCollider();
             this.ForceStanding(remote);
             this.visualPosition = remote.GetWorldPosition();

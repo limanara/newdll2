@@ -22,7 +22,8 @@ if (!$existing) {
 Write-Host "Servidor iniciado. Abra o Cyberpunk e carregue um save de teste." -ForegroundColor Yellow
 Write-Host "Pode permanecer em qualquer local seguro do mapa." -ForegroundColor Yellow
 Write-Host "O simulador consultara sua posicao automaticamente no servidor." -ForegroundColor Yellow
-Write-Host "O teste cobre locomocao, salto, agachamento, mira, tiro, recarga e melee." -ForegroundColor Yellow
+if ($AirOnly) { Write-Host "MODO AIR ONLY: dois saltos parados, sem caminhada ou combate." -ForegroundColor Cyan }
+else { Write-Host "Teste completo: locomocao, salto, agachamento, mira, tiro, recarga e melee." -ForegroundColor Yellow }
 Read-Host "Quando estiver dentro do jogo, pressione ENTER"
 
 if ($AirOnly) { & powershell -ExecutionPolicy Bypass -File $simulator -AirOnly }
